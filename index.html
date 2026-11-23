@@ -995,8 +995,8 @@ const CD = {
       if (v.outcome === 'bin') res.notes.push(BIN_APPROX);
       res.warns.push('Planning value only. Data-driven bandwidths and robust bias-corrected confidence intervals usually need more observations; confirm with rdpower (Cattaneo, Titiunik and Vazquez-Bare).');
       res.how = `Local linear fit on each side with the score evenly spread within the bandwidth: Var = ${CK}σ²(1/nₐ + 1/nᵇ)/jump² (${CK} = boundary variance constant for the ${v.kernel || 'triangular'} kernel, computed numerically).`; res.lab = 'I'; return res; }},
-  Q4: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest change the series can detect'], n: ['No, still planning', 'Show how many points after the change are needed']}, fields: v => itsFields(v, false), compute: v => itsCompute(v, false)},
-  Q5: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest change the series can detect'], n: ['No, still planning', 'Show how many points after the change are needed']}, fields: v => itsFields(v, true), compute: v => itsCompute(v, true)},
+  Q4: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest effect the series can detect'], n: ['No, still planning', 'Show how many time points after the intervention are needed']}, fields: v => itsFields(v, false), compute: v => itsCompute(v, false)},
+  Q5: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest effect the series can detect'], n: ['No, still planning', 'Show how many time points after the intervention are needed']}, fields: v => itsFields(v, true), compute: v => itsCompute(v, true)},
   Q6: {outcomes: true, fields: v => sooFields(v), compute: v => sooCompute(v)},
   O1: {outcomes: true, fields: v => sooFields(v), compute: v => sooCompute(v)},
   Q7: {outcomes: true,
@@ -1052,7 +1052,7 @@ const CD = {
   O4: {modes: MODE_PREC,
     fields: v => [{k:'measure', q:'What is estimated?', type:'choice', def:'prop', opts:[['prop','A percentage'],['mean','A mean']], rerender:true},
       ...(v.mode === 'mde' ? [F.N('How many responses are expected?', 'Completed responses.', 2)] : []),
-      ...((v.measure || 'prop') === 'prop' ? [{k:'p', q:'Expected percentage', h:'50% gives the largest (safest) sample size.', def:50, min:0.01, max:99.99, unit:'%'}, ...(v.mode === 'n' ? [{k:'margin', q:'Required margin of error', h:'Half the width of the confidence interval, in percentage points. For example 3.', min:0.01, max:50, unit:'pp'}] : [])]
+      ...((v.measure || 'prop') === 'prop' ? [{k:'p', q:'Expected percentage in the population', h:'50% gives the largest (safest) sample size.', def:50, min:0.01, max:99.99, unit:'%'}, ...(v.mode === 'n' ? [{k:'margin', q:'Required margin of error', h:'Half the width of the confidence interval, in percentage points. For example 3.', min:0.01, max:50, unit:'pp'}] : [])]
         : [F.sd('From earlier data on the same measure.'), ...(v.mode === 'n' ? [{k:'margin', q:'Required margin of error', h:'Half the width of the confidence interval, in the measure’s units.', min:1e-9, max:1e12}] : [])]),
       {k:'deff', q:'Survey design effect', h:'1 for simple random sampling; higher for clustered or weighted samples.', def:1, min:0.1, max:50},
       {k:'Npop', q:'Population size (optional)', h:'Leave blank for a large population. Used only if the sample is more than 5% of the population.', opt:true, min:2, max:1e12, int:true}, F.conf()],
@@ -1085,9 +1085,9 @@ const CD = {
 };
 // shared field sets
 function itsFields(v, comp){
-  return [{k:'n0', q:'Number of time points before the change', h:'For example 24 monthly values.', min:3, max:2000, int:true},
-    ...(v.mode === 'mde' ? [{k:'n1', q:'Number of time points after the change', h:'', min:1, max:2000, int:true}] : []),
-    {k:'change', q:'Which change must be detected?', type:'choice', def:'level', opts:[['level','A step change in level'],['slope','A change in trend (per time point)']], rerender:true},
+  return [{k:'n0', q:'Number of time points before the intervention', h:'For example 24 monthly values.', min:3, max:2000, int:true},
+    ...(v.mode === 'mde' ? [{k:'n1', q:'Number of time points after the intervention', h:'', min:1, max:2000, int:true}] : []),
+    {k:'change', q:'Which effect must be detected?', type:'choice', def:'level', opts:[['level','A step change in level'],['slope','A change in trend (per time point)']], rerender:true},
     {k:'phi', q:'Lag-1 autocorrelation of the residuals', h:'Correlation between consecutive residuals. 0 means none.', def:0, min:-0.9, max:0.95},
     ...(comp ? [{k:'rs', q:'Correlation between the treated and comparison series', h:'Correlation of the residuals of the two series over the same periods.', min:-0.99, max:0.99}] : []),
     F.sd('SD of the ' + (comp ? 'treated ' : '') + 'series around the trend line. Leave at 1 for results in SD units.'),
@@ -1097,9 +1097,9 @@ function itsCompute(v, comp){
   const sig = comp ? v.sd*Math.sqrt(2*(1 - v.rs)) : v.sd, j = v.change === 'slope' ? 1 : 0, z = E.zsum(v.alpha, v.power/100), res = {main: [], rows: [], notes: [], warns: []};
   const se = n1 => sig*Math.sqrt(E.itsVar(v.n0, n1, v.phi)[j]);
   if (v.mode === 'n') { const n1 = E.nMin(k => S.pnorm(Math.abs(v.delta)/se(k) - E.zA(v.alpha)), v.power/100, j ? 2 : 1, 5000);
-    if (!isFinite(n1)) return {err:`Not reachable by adding points after the change, as uncertainty in the pre-change trend sets a floor. With ${v.n0} points before, the smallest detectable ${j ? 'change in trend' : 'step change'} is ${fX(z*se(5000))}${v.sd === 1 ? ' SD' : ''} even with 5,000 points after. Add points before the change or reduce noise.`}; res.main.push(['Time points needed after the change', fN(n1), `with ${v.n0} before`]); }
-  else { const m = z*se(v.n1); res.main.push([j ? 'Minimum detectable change in trend' : 'Minimum detectable step change', fX(m) + (v.sd === 1 ? ' SD' : ''), j ? 'per time point' : 'at the first point after the change']); }
-  if (v.n0 < 8) res.warns.push('Fewer than 8 points before the change: the pre-change trend is poorly estimated.');
+    if (!isFinite(n1)) return {err:`Not reachable by adding points after the intervention, as uncertainty in the pre-intervention trend sets a floor. With ${v.n0} points before, the smallest detectable ${j ? 'change in trend' : 'step change'} is ${fX(z*se(5000))}${v.sd === 1 ? ' SD' : ''} even with 5,000 points after. Add points before the intervention or reduce noise.`}; res.main.push(['Time points needed after the intervention', fN(n1), `with ${v.n0} before`]); }
+  else { const m = z*se(v.n1); res.main.push([j ? 'Minimum detectable change in trend' : 'Minimum detectable step change', fX(m) + (v.sd === 1 ? ' SD' : ''), j ? 'per time point' : 'at the first point after the intervention']); }
+  if (v.n0 < 8) res.warns.push('Fewer than 8 points before the intervention: the pre-intervention trend is poorly estimated.');
   if (comp) res.notes.push('Analysed as the difference between the treated and comparison series, assuming equal residual SDs and the same autocorrelation.');
   res.notes.push('Assumes the autocorrelation is known. With short series the autocorrelation is estimated imprecisely, so check with simulation (for example the tools in Beard, Brown and Shahab 2025). Seasonality is not modelled.');
   res.how = 'Segmented regression (level, trend, step, trend change) with AR(1) errors; generalised least squares variance; MDE = (z₁₋α/₂ + z₁₋β) × SE.'; res.lab = comp ? 'I' : 'V'; return res;
@@ -1280,7 +1280,7 @@ const EXPLAIN = {
     "Joining raises the reply rate from 20% to 30% for those who join due to the invitation: enter 10."],
   "O5.delta": ["The smallest average change from before to after that would matter.",
     "Average score 60 before; a rise to 63 would matter: enter 3."],
-  "Q4.delta": ["For a step change: how much the level jumps right after the change. For a trend change: how much the slope changes per time point.",
+  "Q4.delta": ["For a step change: how much the level jumps right after the intervention starts. For a trend change: how much the slope changes per time point.",
     "Step: from 100 a month to 110 is 10. Trend: growth of 2 a month becoming 4 a month is 2."],
   "Q5.delta": ["For a step change: how much the treated series jumps relative to the comparison series. For a trend change: how much the difference in slopes changes per time point.",
     "The treated region rises by 10 a month more than the comparison region right after the change: enter 10."],
@@ -1413,13 +1413,13 @@ const explainFor = (id, k) => EXPLAIN[id + "." + k] || EXPLAIN[k];
 const DESIGN_TEXT = {
   R1: {f: "Random allocation of individuals gives the most direct comparison.",
     what: "Individuals are randomly allocated to two or more arms and compared on one outcome window. Example: people due to renew a registration are randomised to a reminder text or no text, and on-time renewal is compared (60% expected without the text).",
-    sel: "Offered for an effect question when allocation can be random, delivery is to individuals, the control group is unlikely to be exposed, and the intervention can be withheld or delayed.",
-    ass: "Random allocation, with outcome data lost at similar rates in each arm. Analysis by t-test, chi-square, ANCOVA, logistic regression or AIPW with baseline covariates. R2 replaces R1 when the control group is likely to be exposed.",
+    sel: "Offered for an effect question when allocation can be random, delivery is to individuals, spillover to the control group is unlikely, and the intervention can be withheld or delayed.",
+    ass: "Random allocation, with outcome data lost at similar rates in each arm. Analysis by t-test, chi-square, ANCOVA, logistic regression or AIPW with baseline covariates. R2 replaces R1 when spillover to the control group is likely.",
     n: "Detecting a rise from 60% to 63% needs 8,258 people (4,129 per arm); baseline covariates explaining 20% of outcome variance (R² 0.2) reduce the sample to 6,606. Strong baseline predictors, such as the same outcome measured earlier, are therefore an efficient way to cut the sample, which scales with (1 − R²). (Same engine as the RCT calculator; label E.)"},
-  R2: {f: "Randomising whole groups prevents contamination at the cost of a design effect.",
+  R2: {f: "Randomising whole groups prevents spillover at the cost of a design effect.",
     what: "Whole groups (offices, schools, regions) are randomised and everyone in a group receives the same condition. Example: offices are randomised to a new case-management process, and the share of cases resolved within 30 days is compared (50% expected under usual practice, 50 cases per office).",
-    sel: "Offered for an effect question when allocation can be random, delivery is to groups (or to individuals when the control group is likely to be exposed), and the intervention can be withheld or delayed.",
-    ass: "Random allocation of clusters, with clustering accounted for in the analysis. Mixed model or GEE; cluster-level analysis with fewer than 30 clusters. R1 is more efficient whenever individuals can be allocated without contamination.",
+    sel: "Offered for an effect question when allocation can be random, delivery is to groups (or to individuals with a risk of spillover to the control group), and the intervention can be withheld or delayed.",
+    ass: "Random allocation of clusters, with clustering accounted for in the analysis. Mixed model or GEE; cluster-level analysis with fewer than 30 clusters. R1 is more efficient whenever individuals can be allocated without spillover.",
     n: "Detecting a rise from 50% to 60% with 50 cases per office needs 24 offices at an ICC of 0.01, 54 at 0.05 and 92 at 0.10 (1,200, 2,700 and 4,600 cases). Adding cases within offices gives diminishing returns, so an ICC estimate from earlier data is the key planning input (design effect 1 + ((CV² + 1)m − 1)ICC, with m cases per office and CV the variation in office size). (Label E; results with fewer than 30 clusters carry a warning.)"},
   R3: {f: "Every cluster receives the intervention, in a random order.",
     what: "Clusters switch from control to intervention at randomly ordered steps until all clusters have the intervention, with outcomes measured in every period. Example: offices adopt a new system in four steps over five periods, with 20 cases per office per period.",
@@ -1448,12 +1448,12 @@ const DESIGN_TEXT = {
     n: "The calculator gives the fixed-design R1 size (788 people for 0.2 SD) with a warning that interim analyses raise the maximum by an amount set by the stopping boundary and the number of looks. That maximum is not computed and needs dedicated group-sequential software (the expected size can still fall below the fixed design when the trial stops early). (Label E for the fixed design.)"},
   Q1: {f: "The comparison group's change stands in for what would have happened.",
     what: "Units that received a change and units that did not are compared on how much the outcomes moved from before to after. Example: a new processing rule starts in some offices in 2025, and the change in a quarterly outcome over four quarters before and four after is compared with offices without the rule.",
-    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to individuals or groups, and at least one measurement period exists before the change.",
+    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to individuals or groups, and at least one measurement period exists before the intervention.",
     ass: "Parallel trends (without the change, both groups would have moved in parallel) and no anticipation. Two-way fixed effects; with staggered adoption, Callaway and Sant'Anna or a similar estimator, since two-way fixed effects can be biased there. Q5 suits few units with long series, and Q3 suits a sharp eligibility cut-off.",
     n: "Detecting 0.2 SD with four periods before and four after needs 197 units when a unit's outcomes correlate at 0.5 across periods, and 79 at 0.8. Long panels of stable units therefore need fewer units, as the variance per unit falls with (1 − ρ)(m + r)/(mr) for m periods before and r after. (Equal correlation between all periods assumed; label I; correlation that decays over time or staggered timing calls for simulation.)"},
   Q2: {f: "One treated unit is compared with a weighted blend of untreated units.",
     what: "A weighted combination of untreated units (donors) is built to match the treated unit's outcome series before the change, and the gap after the change is the estimated effect. Example: one region introduces a new policy, and the region's monthly outcome is compared with a blend of 19 other regions that tracked that outcome closely beforehand.",
-    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to a population or group, and at least 10 periods exist before the change (the threshold of 10 is an assumption in the catalogue).",
+    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to a population or group, and at least 10 periods exist before the intervention (the threshold of 10 is an assumption in the catalogue).",
     ass: "The weighted donors reproduce what would have happened to the treated unit, and no donor is affected by the change. Synthetic control with placebo (permutation) inference, assigning the change to each donor in turn. Q5 is the alternative when a single comparison series is credible, and Q1 when many units are treated.",
     n: "No minimum detectable effect exists; the number of donors sets the smallest p-value the placebo test can reach, 1/(donors + 1). With 9 donors the smallest p-value is 0.1, so p ≤ 0.05 is unreachable whatever the effect, while 19 donors give 0.05 and 39 give 0.025. Beyond that bound, detection depends on the effect relative to the donors' placebo gaps, which only a placebo simulation shows. (Label E for the p-value bound.)"},
   Q3: {f: "Units just either side of a cut-off are compared.",
@@ -1463,17 +1463,17 @@ const DESIGN_TEXT = {
     n: "Detecting 0.2 SD in a sharp design needs 3,768 observations within the bandwidth (1,884 each side), 4.8 times a simple two-group comparison with a triangular kernel. A 50 percentage point jump in treatment instead of 100 raises the requirement fourfold to 15,070, as the variance scales with one over the squared jump. (Flat score density assumed; label I; data-driven bandwidths and robust bias-corrected intervals usually need more, so confirm with rdpower.)"},
   Q4: {f: "The series' own earlier trend stands in for what would have happened.",
     what: "One outcome series measured at many regular points is compared with the projection of the series' trend from before the change. Example: a form changes nationally in July 2025, and the monthly completion rate for 36 months before and 18 after is analysed.",
-    sel: "Offered for an effect question when nobody controls who receives the change, delivery is to a whole population, and at least 8 periods exist before the change (the threshold of 8 is an assumption in the catalogue).",
+    sel: "Offered for an effect question when nobody controls who receives the intervention, delivery is to a whole population, and at least 8 periods exist before the intervention (the threshold of 8 is an assumption in the catalogue).",
     ass: "The pre-change trend would have continued, and nothing else changed at the same time. Segmented regression with autocorrelation (ARIMA or Newey-West). Q5 adds a comparison series that absorbs shared shocks.",
     n: "With 36 points before and 18 after, the smallest detectable step change is 1.96 SD at a lag-1 autocorrelation of 0.3, 1.59 SD with no autocorrelation, and 2.5 SD when only 12 points precede the change. Uncertainty in the pre-change trend sets a floor that more points after the change cannot remove, so a short pre-change series cannot be rescued by longer follow-up. (AR(1) GLS with known autocorrelation; label V; seasonality not modelled, and short series call for simulation.)"},
   Q5: {f: "A comparison series removes shocks shared with the treated series.",
     what: "The treated series and a similar untreated series are measured at many regular points before and after the change, and the effect is how far the gap between the two series departs from the gap's earlier trend. Example: one region starts a new reminder letter in July 2025, with monthly response rates for 36 months before and 18 after for that region and a neighbouring region that kept the old letter (a system outage that lowers responses in both regions in March 2026 cancels out in the gap).",
-    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to a population or group, and at least 8 periods exist before the change.",
+    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to a population or group, and at least 8 periods exist before the intervention.",
     ass: "Without the change, the gap between the series would have kept to the gap's earlier trend; the assumption fails if the change spills over into the comparison series, or if something else (including how the outcome is recorded) changes in only one series. Segmented regression with level, trend, step change and trend change, each interacted with group, allowing for autocorrelation. Unlike Q1, which usually has many units and few periods, Q5 suits one or a few series with many periods and models each trend explicitly.",
     n: "With 36 points before, 18 after and an autocorrelation of 0.3, the smallest detectable step change is 2.77 SD when the two series are uncorrelated, 1.96 SD at a correlation of 0.5 (the same as Q4) and 1.24 SD at 0.8. A comparison series improves precision only above a correlation of 0.5, since the gap has SD σ√(2(1 − ρ)), although the comparison series still guards against shared shocks below that correlation. (Equal SDs and autocorrelation in both series assumed; label I; check by simulation.)"},
   Q6: {f: "Recorded characteristics must explain who took up the treatment.",
     what: "Treated and untreated units are compared after adjusting for recorded characteristics that drive both uptake and the outcome, by regression adjustment, matching, inverse probability weighting (IPW) or augmented IPW (AIPW). Example: people chose whether to attend an optional workshop, and attenders' later outcomes are compared with those of non-attenders after adjusting for prior behaviour and history in administrative records.",
-    sel: "Offered for an effect question when nobody controls who receives the treatment, delivery is to individuals, and rich pre-treatment data overlap between treated and untreated units (with a warning when the data are only partial).",
+    sel: "Offered for an effect question when nobody controls who receives the treatment, delivery is to individuals, and pre-treatment data cover the confounders, with treated and untreated units overlapping on the confounders (with a warning when the data are only partial).",
     ass: "No unmeasured confounding, and overlap (every kind of unit could have been treated or not). Balance and overlap diagnostics, then one of the four methods, with a sensitivity analysis for unmeasured confounding. Differences are associated with treatment and estimate the treatment effect only if no unmeasured confounding remains. O1 adds a trial-like protocol with an explicit time zero.",
     n: "Detecting 0.2 SD needs 785 units with perfect balance, 1,122 when weighting cuts the effective sample to 70% (effective size ratio 0.7), and 785 again when covariates also explain 30% of outcome variance (R² 0.3). The default ratio of 0.7 is an assumption in the catalogue, best replaced by the ratio from a pilot propensity model. (Two-group normal approximation, variance × (1 − R²)/ratio after trimming; label I.)"},
   Q7: {f: "A factor that shifts uptake but not the outcome isolates the effect.",
@@ -1481,14 +1481,14 @@ const DESIGN_TEXT = {
     sel: "Offered for an effect question when nobody controls who receives the treatment and delivery is to individuals.",
     ass: "Relevance (the instrument shifts uptake), exclusion (no other path to the outcome) and independence from unmeasured factors. Two-stage least squares, with the estimate applying to units whose uptake responds to the instrument. R6 creates such an instrument by randomising encouragement.",
     n: "Detecting 0.2 SD needs 15,698 units when the instrument explains 5% of the variation in treatment (first-stage partial R² 0.05), and 3,925 at 20%. Weak instruments multiply the sample, as the variance is divided by the first-stage R² (20 times a simple comparison at 0.05); the calculator also reports the expected first-stage F (826 and 981 here) and warns below 10. (Asymptotic IV variance, normal approximation; label I.)"},
-  Q8: {f: "Eligible units held back for reasons outside the case act as controls.",
+  Q8: {f: "Eligible units held back for reasons unrelated to unit features act as controls.",
     what: "Some eligible units are not treated for reasons unrelated to the case (capacity limits, throttling, workload, processing order), and these held-back units are compared with treated units from the same periods. Example: a new process was rolled out, but in some months capacity limits held back 20% of eligible cases, and treated and held-back cases from those months are compared (40% expected outcome rate among held-back cases).",
-    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, and recommended when some eligible units were not treated for reasons outside the case.",
+    sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, and recommended when some eligible units were held back for reasons unrelated to unit features.",
     ass: "Holdback unrelated to likely outcomes (as-if random), possibly after adjusting for recorded case features and period. Comparison within the same periods, with period fixed effects, balance checks, regression or AIPW adjustment and a sensitivity analysis. Differences are associated with treatment and estimate the treatment effect only to the extent that holdback was as-if random; Q3 applies instead when holdback follows a score cut-off.",
     n: "Detecting a rise from 40% to 45% needs 4,806 eligible units in holdback periods when 20% are held back (3,845 treated, 962 held back), and 3,067 when half are held back. With 5,000 units and 20% held back, the smallest detectable change is +4.9 or −4.78 percentage points. (Two-arm RCT formula with allocation treated : held back, variance × (1 − R²)/effective size ratio; label I.)"},
   O1: {f: "Existing data are analysed as if the data came from a specified trial.",
     what: "The protocol of a hypothetical randomised trial (eligibility, treatment strategies, time zero, follow-up, outcome) is written first and then emulated with existing data. Example: administrative records are used to emulate a trial of joining a support program within 30 days of becoming eligible against not joining, with follow-up starting at eligibility for both groups.",
-    sel: "Offered for an effect question when nobody controls who receives the treatment, delivery is to individuals, and rich pre-treatment data overlap between treated and untreated units.",
+    sel: "Offered for an effect question when nobody controls who receives the treatment, delivery is to individuals, and pre-treatment data cover the confounders, with treated and untreated units overlapping on the confounders.",
     ass: "No unmeasured confounding, and a time zero aligned with eligibility and treatment assignment (misalignment creates immortal time bias). Inverse probability weighting, AIPW, cloning with censoring and weighting, or other g-methods. Differences are associated with the treatment strategy unless confounding is fully controlled; Q6 shares this assumption without the explicit protocol.",
     n: "The calculation matches Q6: 785 units detect 0.2 SD with perfect balance, and 1,122 are needed at an effective size ratio of 0.7. Cloning and censoring reduce the effective sample further in ways the calculator does not model (Inferred), so complex strategies call for simulation. (Label I.)"},
   O2: {f: "Exposed and unexposed people are followed forward in time.",
@@ -1501,7 +1501,7 @@ const DESIGN_TEXT = {
     sel: "Offered for association questions when nobody controls the exposure.",
     ass: "Controls must represent the population that produced the cases, and exposure must be recorded equally well in both groups (selection and recall bias). Conditional or unconditional logistic regression, giving odds ratios. O2 gives incidence and hazard ratios when the outcome is common enough to follow forward.",
     n: "Detecting an odds ratio of 1.5 needs 535 cases and 535 controls, or 325 cases with four controls each (1,300 controls). Extra controls therefore substitute for scarce cases, with little gained beyond four per case. (Fleiss z test with k controls per case, as in the RCT calculator; label E.)"},
-  O4: {f: "A sample measured once describes how common something is.",
+  O4: {f: "A sample measured once describes how common a characteristic is.",
     what: "A sample is drawn from a defined population and measured at a single point in time to estimate a proportion or mean. Example: a sample of businesses is asked about awareness of a new rule, aiming for a margin of error of ±3 percentage points.",
     sel: "Offered for descriptive or association questions when nobody controls the exposure.",
     ass: "Exposure and outcome are measured at the same time, so temporal order and cause cannot be established. Weighted proportions or means that reflect the survey design. O2 is needed when the order of events matters.",
@@ -1555,37 +1555,41 @@ const STEPS = [
  {id:"start", q:"What is the research question about?", h:"Pick the closest topic; the topic can be changed later from the answer list.", when:A=>true, options:[
    {label:"The effect of an intervention, policy or program", desc:"Did a reminder letter change response rates? Does a treatment change the behaviour of interest?", set:{start:"yes"}},
    {label:"Predicting or classifying an outcome", desc:"A risk score, a screening test, or a flag that identifies who is likely to have the outcome.", set:{start:"no", nc_pred:"yes"}},
-   {label:"How common something is, or the level of a measure", desc:"Prevalence, averages or distributions in a population at a point in time.", set:{start:"no", nc_pred:"no", nc_prev:"yes"}},
+   {label:"How common a characteristic is, or the level of a measure", desc:"Prevalence, averages or distributions in a population at a point in time.", set:{start:"no", nc_pred:"no", nc_prev:"yes"}},
    {label:"What is associated with an outcome", desc:"Risk factors or characteristics linked to an outcome, without testing an intervention.", set:{start:"no", nc_pred:"no", nc_prev:"no"}}
  ]},
  {id:"nc_pred", q:"Is the aim to predict or classify an outcome?", h:"A risk score, a screening test, or a flag that identifies who is likely to have the outcome.", when:A=>A.start==="no"},
- {id:"p_ref", q:"Is a test or flag compared against a reference standard?", h:"A reference standard is the best available way to confirm who truly has the outcome.", when:A=>A.nc_pred==="yes"},
+ {id:"p_ref", q:"Is the accuracy of a test or flag checked against a reference standard?", h:"A reference standard is the best available way to confirm who truly has the outcome (a diagnostic accuracy study).", when:A=>A.nc_pred==="yes"},
  {id:"p_exist", q:"Does the prediction model already exist?", h:"Answer No if the model is still being built.", when:A=>A.p_ref==="no"},
- {id:"p_impact", q:"Is the question whether using the model changes outcomes, rather than how accurate the model is?", h:"Accuracy (AUC, calibration) and impact on outcomes are different questions.", when:A=>A.p_exist==="yes"},
+ {id:"p_impact", q:"Is the question whether using the model in practice changes outcomes (an impact study)?", h:"Answer No if the question is how accurate the model is in new data (a validation study, using AUC and calibration).", when:A=>A.p_exist==="yes"},
  {id:"nc_prev", q:"Is the question how common something is, or the level of a measure, in a population?", h:"Prevalence, averages or distributions at a point in time.", when:A=>A.nc_pred==="no"},
- {id:"ae_rare", q:"The question is what is associated with an outcome. Is the outcome rare?", h:"Rare: too few events would occur if everyone were followed up.", when:A=>A.nc_prev==="no"},
+ {id:"ae_rare", q:"Is the outcome so rare that following up a cohort would yield too few cases?", h:"A case-control study then samples people with and without the outcome instead of following everyone up.", when:A=>A.nc_prev==="no"},
  {id:"c_rand", q:"Can the intervention be allocated at random?", h:"Random allocation by lottery or computer, at the level of people or groups. Answer No if allocation was by rule, by staff or by capacity.", when:A=>A.start==="yes"},
- {id:"c_withhold", q:"Can a control group go without the intervention for the study period?", h:"Usual practice or a delayed start both count.", when:A=>A.c_rand==="yes"},
- {id:"c_encourage", q:"Can some people be encouraged at random to take up the intervention instead?", h:"An invitation, reminder or nudge sent at random while everyone keeps access.", when:A=>A.c_withhold==="no"},
- {id:"c_group", q:"Is the intervention delivered through groups, or could the control group also be exposed to the intervention?", h:"Groups such as offices, schools, clinics or regions.", when:A=>A.c_withhold==="yes"},
- {id:"c_allget", q:"Must every group receive the intervention eventually, with only the timing randomised?", h:"A phased rollout in random order.", when:A=>A.c_group==="yes"},
- {id:"c_two", q:"Are two interventions tested at the same time?", h:"Each unit can get neither, either or both.", when:A=>A.c_group==="no"},
- {id:"c_cross", q:"Could each person receive both conditions in turn?", h:"Only if the outcome is stable and the effect wears off between periods.", when:A=>A.c_two==="no"},
- {id:"c_interim", q:"Are interim analyses needed to stop early for benefit or harm?", h:"Requires outcomes that arrive quickly during recruitment.", when:A=>A.c_cross==="no"},
- {id:"n_cut", q:"Is eligibility linked to a cut-off on a continuous score?", h:"For example: cases scoring above 70 become eligible. Answer Yes even if the cut-off is not applied consistently.", when:nonrandom},
- {id:"n_cut_sharp", q:"Is the cut-off applied consistently: almost everyone above the cut-off treated and almost no one below?", h:"Answer No if staff discretion, capacity or timing means many above the cut-off were not treated.", when:A=>nonrandom(A)&&A.n_cut==="yes"},
- {id:"n_cut_jump", q:"Does the chance of being treated still jump noticeably at the cut-off?", h:"For example: 10% treated just below and 60% just above.", when:A=>nonrandom(A)&&A.n_cut_sharp==="no"},
- {id:"n_hold", q:"Among eligible units, were some not treated for reasons outside the case itself?", h:"Capacity limits, throttling, workload, processing order or system outages, including holdback in some periods only.", when:nonrandom},
- {id:"n_hold_random", q:"Was the holdback unrelated to the features of each case?", h:"Answer No if staff chose which cases to hold back based on case characteristics or expected outcome.", when:A=>nonrandom(A)&&A.n_hold==="yes"},
+ {id:"c_withhold", q:"Can a control group go without the intervention for the study period?", h:"A control group receiving usual practice or a delayed start counts as Yes.", when:A=>A.c_rand==="yes"},
+ {id:"c_encourage", q:"Can encouragement to take up the intervention be allocated at random (an encouragement design)?", h:"An invitation, reminder or nudge is sent at random while everyone keeps access to the intervention.", when:A=>A.c_withhold==="no"},
+ {id:"c_group", q:"Is the intervention delivered to whole groups rather than to individuals?", h:"Groups such as offices, schools, clinics or regions.", when:A=>A.c_withhold==="yes"},
+ {id:"c_spill", q:"Is there a risk of spillover, with control units affected by the intervention through contact with treated units?", h:"For example, treated and control staff in the same office sharing advice from the intervention. Randomising whole groups prevents spillover.", when:A=>A.c_group==="no"},
+ {id:"c_allget", q:"Must every group receive the intervention by the end of the study?", h:"A Yes leads to a stepped-wedge design: only the order of rollout is randomised, for example offices switching to the intervention in a random order.", when:A=>A.c_group==="yes"||A.c_spill==="yes"},
+ {id:"c_two", q:"Are two interventions tested so that each unit can receive neither, either or both (a factorial design)?", h:"Answer No for interventions compared only with each other or with one control group, which are separate arms of a parallel RCT.", when:A=>A.c_spill==="no"},
+ {id:"c_cross", q:"Can each unit receive both conditions in turn (a crossover design)?", h:"Suitable only when the outcome is stable over time and the intervention effect wears off between periods (no carry-over).", when:A=>A.c_two==="no"},
+ {id:"c_interim", q:"Are interim analyses planned so that the trial can stop early for benefit or harm?", h:"A group-sequential design. Requires outcomes that arrive quickly relative to recruitment.", when:A=>A.c_cross==="no"},
+ {id:"n_cut", q:"Is eligibility for the intervention based on a cut-off on a continuous score?", h:"For example: cases scoring above 70 become eligible (a regression discontinuity design). Answer Yes even if the cut-off is not applied consistently.", when:nonrandom},
+ {id:"n_cut_sharp", q:"Is the cut-off applied consistently: almost everyone above the cut-off treated and almost no one below?", h:"A consistent cut-off gives a sharp regression discontinuity. Answer No if staff discretion, capacity or timing means many above the cut-off were not treated.", when:A=>nonrandom(A)&&A.n_cut==="yes"},
+ {id:"n_cut_jump", q:"Does the chance of being treated still jump noticeably at the cut-off?", h:"For example: 10% treated just below and 60% just above (a fuzzy regression discontinuity).", when:A=>nonrandom(A)&&A.n_cut_sharp==="no"},
+ {id:"n_hold", q:"Were some eligible units held back from treatment?", h:"For example due to capacity limits, throttling, workload, processing order or system outages, including holdback in some periods only.", when:nonrandom},
+ {id:"n_hold_random", q:"Was the choice of which units to hold back unrelated to the features of each unit?", h:"Answer No if staff chose the held-back units based on unit characteristics or expected outcome.", when:A=>nonrandom(A)&&A.n_hold==="yes"},
  {id:"n_timing", q:"Does treatment start at different times for different units?", h:"Staggered or inconsistent timing of assignment.", when:nonrandom},
- {id:"n_prepost", q:"Are outcome data available for treated and comparison units from before treatment started?", h:"At least one period before; more periods improve power.", when:nonrandom},
- {id:"n_pop", q:"Does the change affect a whole population from the same known date?", h:"For example: a law or national policy that starts on one day for everyone.", when:nonrandom},
- {id:"n_comp", q:"Is there a comparable series that the change did not affect?", h:"Another region, age group or outcome measured the same way over the same period.", when:A=>nonrandom(A)&&A.n_pop==="yes"},
- {id:"n_its", q:"Are at least 8 measurements available from before the change?", h:"For example: monthly data for 8 months or more before the start.", when:A=>nonrandom(A)&&A.n_pop==="yes"},
- {id:"n_few", q:"Were only one or a few aggregate units treated, with many untreated units to compare against?", h:"For example: one state or region, with 10 or more periods of data before the change.", when:A=>nonrandom(A)&&A.n_pop==="no"},
- {id:"n_iv", q:"Is there a factor that changes who gets treated but affects the outcome only through treatment?", h:"For example: a random processing order or which officer happened to be rostered.", when:nonrandom},
- {id:"n_soo", q:"Are rich pre-treatment data available on what drives both treatment and the outcome?", h:"And treated and untreated units overlap on that data (similar cases in both groups).", when:nonrandom},
- {id:"n_tte", q:"Is there longitudinal data with a clear start time for each unit?", h:"Eligibility, treatment start and follow-up can be defined as in a trial.", when:A=>nonrandom(A)&&A.n_soo==="yes"}
+ {id:"n_prepost", q:"Are outcome data available for treated and comparison units from before treatment started?", h:"At least one period before, for a difference-in-differences comparison; more periods improve power.", when:nonrandom},
+ {id:"n_pop", q:"Does the intervention apply to a whole population from one known date?", h:"For example: a law or national policy that starts on one day for everyone, leaving no untreated units in that population.", when:nonrandom},
+ {id:"n_comp", q:"Is there a comparable time series that the intervention did not affect?", h:"Another region, age group or outcome measured the same way over the same period (a comparative interrupted time series).", when:A=>nonrandom(A)&&A.n_pop==="yes"},
+ {id:"n_its", q:"Are outcome data available for at least 8 time points before the intervention?", h:"For example: monthly data for 8 months or more before the start (an interrupted time series).", when:A=>nonrandom(A)&&A.n_pop==="yes"},
+ {id:"n_few", q:"Were only one or a few aggregate units treated, such as one state or region?", h:"Aggregate units are areas or organisations measured as a whole, not individuals.", when:A=>nonrandom(A)&&A.n_pop==="no"},
+ {id:"n_donor", q:"Are outcome data available for many untreated aggregate units, covering 10 or more periods before the intervention?", h:"The untreated units form the donor pool, which a synthetic control combines into a weighted comparison.", when:A=>nonrandom(A)&&A.n_few==="yes"},
+ {id:"n_iv", q:"Is there a factor that affects who is treated, such as a random processing order or which officer happened to be rostered?", h:"A candidate instrument. The factor must be unrelated to the features of each unit, as with a random order or roster.", when:nonrandom},
+ {id:"n_iv_excl", q:"Does the factor affect the outcome only through treatment?", h:"The exclusion restriction. Answer No if the factor also changes the outcome in other ways, for example rostered officers who differ in treatment rates and also in case assessment.", when:A=>nonrandom(A)&&A.n_iv==="yes"},
+ {id:"n_soo", q:"Do pre-treatment data cover the factors that drive both treatment and the outcome (the confounders)?", h:"Selection on observables assumes no important confounder is missing from the data.", when:nonrandom},
+ {id:"n_overlap", q:"Do treated and untreated units overlap on the confounders?", h:"Overlap means units with similar confounder values appear in both groups. Answer No if some kinds of units are always or never treated.", when:A=>nonrandom(A)&&A.n_soo==="yes"},
+ {id:"n_tte", q:"Are longitudinal data available with a clear start of follow-up (time zero) for each unit?", h:"Eligibility, treatment start and follow-up can be defined as in a trial (target trial emulation).", when:A=>nonrandom(A)&&A.n_overlap==="yes"}
 ];
 const Q = Object.fromEntries(STEPS.map(s=>[s.id,s]));
 
@@ -1616,16 +1620,16 @@ function nonRandomResult(A){
   const c = []; const add=(id,rank,why,variant)=>{ if(!c.find(x=>x.id===id)) c.push({id,rank,why,variant}); };
   const notes = [];
   if (A.n_cut==="yes" && A.n_cut_sharp==="yes") add("Q3",1,"Cut-off applied consistently","Sharp RDD");
-  if (A.n_hold==="yes" && A.n_hold_random==="yes") add("Q8",2,"Eligible units held back for reasons outside the case");
+  if (A.n_hold==="yes" && A.n_hold_random==="yes") add("Q8",2,"Eligible units held back for reasons unrelated to unit features");
   if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="yes") add("Q3",3,"Chance of treatment jumps at the cut-off","Fuzzy RDD: the cut-off acts as an instrument; estimates apply to cases near the cut-off whose treatment depends on the cut-off");
   if (A.n_prepost==="yes") add("Q1",4, A.n_timing==="yes"?"Pre-treatment data with staggered timing":"Pre-treatment data for treated and comparison units", A.n_timing==="yes"?"Staggered adoption: use heterogeneity-robust estimators, not plain two-way fixed effects":undefined);
-  if (A.n_comp==="yes") add("Q5",5,"Population change with an unaffected comparison series");
-  if (A.n_few==="yes") add("Q2",6,"Few treated aggregate units");
-  if (A.n_iv==="yes") add("Q7",7,"A factor shifts treatment but not the outcome directly");
-  if (A.n_its==="yes") add("Q4",8,"Population change with 8 or more prior points");
+  if (A.n_comp==="yes") add("Q5",5,"Population-wide intervention with an unaffected comparison series");
+  if (A.n_few==="yes" && A.n_donor==="yes") add("Q2",6,"Few treated aggregate units with a donor pool");
+  if (A.n_iv==="yes" && A.n_iv_excl==="yes") add("Q7",7,"A factor shifts treatment and affects the outcome only through treatment");
+  if (A.n_its==="yes") add("Q4",8,"Population-wide intervention with 8 or more prior time points");
   if (A.n_hold==="yes" && A.n_hold_random==="no") add("Q6",9,"Held-back cases were selected on case features, so adjust for those features","Within eligible units: compare treated with held-back cases after adjusting for the features used to choose the held-back cases");
-  if (A.n_soo==="yes") add("Q6",9,"Rich pre-treatment data with overlap");
-  if (A.n_tte==="yes") add("O1",9.5,"Longitudinal data with a clear start time");
+  if (A.n_soo==="yes" && A.n_overlap==="yes") add("Q6",9,"Pre-treatment data on the confounders, with overlap");
+  if (A.n_tte==="yes") add("O1",9.5,"Longitudinal data with a clear time zero");
   if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="no") notes.push("The cut-off only defines who is eligible and does not identify an effect by itself. Restrict the comparison to eligible units.");
   if (A.n_timing==="yes" && A.n_prepost!=="yes") notes.push("Inconsistent timing alone does not identify an effect without data from before treatment. With a held-back group, compare within each period (period fixed effects).");
   if (A.n_hold==="yes" && A.n_timing==="yes") notes.push("Holdback that occurs only in some periods: use only those periods for the treated versus held-back comparison and include period fixed effects; check that cases in those periods resemble the rest.");
