@@ -397,7 +397,7 @@ summary:focus-visible,select:focus-visible,.dpick select:focus{outline:2px solid
     <aside class="card trail">
       <h2>Answers</h2>
       <ol id="trail"></ol>
-      <p id="trailEmpty" class="empty">No answers yet. Click an earlier answer to change it.</p>
+      <p id="trailEmpty" class="empty">No answers yet. Each answer appears here and can be changed with a click.</p>
     </aside>
   </div>
   <footer id="foot"></footer>
@@ -816,12 +816,12 @@ const fP = x => fX(100*x) + '%';
 const F = {
   alpha: () => ({k:'alpha', q:'Significance level (two-sided alpha)', h:'Usually 0.05.', def:0.05, min:0.0001, max:0.5}),
   conf: () => ({k:'alpha', q:'One minus the confidence level', h:'0.05 gives a 95% confidence interval.', def:0.05, min:0.0001, max:0.5}),
-  power: () => ({k:'power', q:'Power', h:'The chance of detecting the effect if it is real. Usually 80%.', def:80, min:50, max:99.9, unit:'%'}),
+  power: () => ({k:'power', q:'Power', h:'The chance of detecting the effect if the effect is real. Usually 80%.', def:80, min:50, max:99.9, unit:'%'}),
   sd: h => ({k:'sd', q:'Standard deviation of the outcome', h: h || 'From earlier data on the same outcome and population. Leave at 1 to get effects in standard deviation (SD) units.', def:1, min:1e-9, max:1e12}),
   delta: q => ({k:'delta', q: q || 'Smallest difference in means worth detecting', h:'In the outcome’s units (SD units if the SD is 1). The sign does not matter.', min:-1e12, max:1e12, nz:true}),
   p0: q => ({k:'p0', q: q || 'Expected percentage with the outcome in the comparison group', h:'From earlier data, for example the most recent period.', min:0.01, max:99.99, unit:'%'}),
   pp: q => ({k:'pp', q: q || 'Smallest change worth detecting, in percentage points', h:'Positive for an increase, negative for a decrease. From 20% to 23% is 3.', min:-99.98, max:99.98, unit:'pp', nz:true}),
-  r2: () => ({k:'r2', q:'Share of outcome variance explained by covariates (R²)', h:'Baseline values of the outcome usually explain the most. Use 0 if unknown. For one baseline measure, R² is its correlation with the outcome, squared.', def:0, min:0, max:0.99, rerender:true}),
+  r2: () => ({k:'r2', q:'Share of outcome variance explained by covariates (R²)', h:'Baseline values of the outcome usually explain the most. Use 0 if unknown. For one baseline measure, R² is the squared correlation between that measure and the outcome.', def:0, min:0, max:0.99, rerender:true}),
   q: () => ({k:'q', q:'Number of covariates in the analysis model', h:'Used only for the degrees of freedom.', def:1, min:1, max:500, int:true}),
   attr: () => ({k:'attr', q:'Expected loss of outcome data (attrition)', h:'Share of units whose outcome will be missing. The result is inflated (planning) or reduced (fixed sample) by this share.', def:0, min:0, max:95, unit:'%'}),
   N: (q, h, min = 4) => ({k:'N', q, h, min, max:1e9, int:true}),
@@ -841,8 +841,8 @@ const mdeSym = (se, v) => v.outcome === 'bin' ? mdeBin(se < 1 - v.p0/100 ? se : 
 const recruit = (n, attr) => Math.ceil(n/(1 - (attr || 0)/100) - 1e-9);
 const analysable = (N, attr) => Math.floor(N*(1 - (attr || 0)/100) + 1e-9);
 const BIN_APPROX = 'Binary outcome: variance taken as p(1−p) at the comparison-group percentage, a normal approximation.';
-const MODE_DEFAULT = {mde: ['Yes, the sample is fixed', 'Show the smallest effect it can detect (minimum detectable effect)'], n: ['No, still planning', 'Show the sample size needed to detect a given effect']};
-const MODE_PREC = {mde: ['Yes, the sample is fixed', 'Show the precision it gives'], n: ['No, still planning', 'Show the sample size needed for a target precision']};
+const MODE_DEFAULT = {mde: ['Yes, the sample is fixed', 'Show the smallest effect the sample can detect (minimum detectable effect)'], n: ['No, still planning', 'Show the sample size needed to detect a given effect']};
+const MODE_PREC = {mde: ['Yes, the sample is fixed', 'Show the precision of the fixed sample'], n: ['No, still planning', 'Show the sample size needed for a target precision']};
 
 // ---- R1-type questions (also used by R5 main effects, R6, R7, P4) ----
 function r1Fields(v, o = {}){
@@ -850,7 +850,7 @@ function r1Fields(v, o = {}){
   if (v.mode === 'mde') f.push(F.N(o.nq || 'How many units can be included in total, across all arms?', 'Units randomised, before any loss of outcome data.'));
   if (!o.twoArm) { f.push({k:'k', q:'Number of arms, including control', h:'Each treatment arm is compared with the control arm.', def:2, min:2, max:8, int:true, rerender:true});
     f.push({k:'ratio', q:'Control units per unit in each treatment arm', h:'1 for equal allocation; 2 puts twice as many units in control.', def:1, min:0.1, max:10});
-    if ((v.k || 2) > 2) f.push({k:'adjust', q:'Adjustment for multiple comparisons', type:'choice', def:'bonf', opts:[['bonf','Bonferroni (default)'],['dunnett','Dunnett'],['none','None']], h:'Holm is sized as Bonferroni and a fixed testing sequence as None; the RCT calculator shows their per-comparison power.'}); }
+    if ((v.k || 2) > 2) f.push({k:'adjust', q:'Adjustment for multiple comparisons', type:'choice', def:'bonf', opts:[['bonf','Bonferroni (default)'],['dunnett','Dunnett'],['none','None']], h:'Holm is sized as Bonferroni and a fixed testing sequence as None; the RCT calculator shows the per-comparison power of both procedures.'}); }
   if (v.outcome === 'bin') {
     f.push(F.p0(o.p0q || 'Expected percentage with the outcome in the control group'));
     if (!o.noEst) f.push({k:'estimand', q:'Effect measure used in the analysis', type:'choice', def:'rd', opts:[['rd','Difference in percentage points'],['rr','Risk ratio'],['or','Odds ratio']], rerender:true, h:'Sets the test. Results are shown in percentage points either way.'});
@@ -913,12 +913,12 @@ function r2Compute(v){
 
 const CD = {
   R1: {outcomes: true, fields: v => r1Fields(v), compute: v => r1Compute(v)},
-  R2: {outcomes: true, modes: {mde: ['Yes, the clusters are fixed', 'Show the smallest effect they can detect'], n: MODE_DEFAULT.n}, fields: r2Fields, compute: r2Compute},
-  R3: {outcomes: true, modes: {mde: ['Yes, the clusters are fixed', 'Show the smallest effect they can detect'], n: ['No, still planning', 'Show the number of clusters needed']},
-    fields: v => [ ...(v.mode === 'mde' ? [F.N('How many clusters are there?', 'They are spread as evenly as possible across the steps.', 2)] : []),
+  R2: {outcomes: true, modes: {mde: ['Yes, the clusters are fixed', 'Show the smallest effect the clusters can detect'], n: MODE_DEFAULT.n}, fields: r2Fields, compute: r2Compute},
+  R3: {outcomes: true, modes: {mde: ['Yes, the clusters are fixed', 'Show the smallest effect the clusters can detect'], n: ['No, still planning', 'Show the number of clusters needed']},
+    fields: v => [ ...(v.mode === 'mde' ? [F.N('How many clusters are there?', 'Clusters are spread as evenly as possible across the steps.', 2)] : []),
       {k:'steps', q:'Number of steps (sequences)', h:'Groups of clusters that switch to the intervention at the same time. Periods = steps + 1.', min:1, max:30, int:true},
       {k:'m', q:'Individuals with outcome data per cluster per period', h:'Different individuals in each period (cross-sectional design).', min:1, max:1e6},
-      F.icc(), {k:'cac', q:'Cluster autocorrelation', h:'Correlation between a cluster’s true means in different periods. 1 assumes it never changes (Hussey and Hughes model); lower values are more realistic over long studies.', def:0.8, min:0, max:1},
+      F.icc(), {k:'cac', q:'Cluster autocorrelation', h:'Correlation between a cluster’s true means in different periods. 1 assumes a cluster’s true mean never changes (Hussey and Hughes model); lower values are more realistic over long studies.', def:0.8, min:0, max:1},
       ...outFields(v), F.alpha(), F.power()],
     compute: v => { const sig = sigmaOf(v), z = E.zsum(v.alpha, v.power/100), res = {main: [], rows: [], notes: [], warns: []};
       let I = v.N; const se = I0 => sig*Math.sqrt(E.swVar(I0, v.steps, v.m, v.icc, v.cac));
@@ -941,7 +941,7 @@ const CD = {
       else { const N = analysable(v.N, v.attr); if (N < 4) return {err:'Too few participants.'}; const se = v.sd*Math.sqrt(2*(1 - v.rho)/N); res.main.push(...mdeCont(E.bis(d => E.xoPow(d, v.sd, v.rho, N, v.alpha), v.power/100, 0, 60*se), v.sd)); res.rows.push(['Analysed', fN(N)]); }
       res.notes.push('Assumes no carry-over and a period effect in the model.'); res.how = 'Var = 2σ²(1 − ρ)/N, which is (1 − ρ)/2 of a parallel trial with the same N; noncentral t with N − 2 df.'; res.lab = 'E'; return res; }},
   R5: {outcomes: true,
-    fields: v => [{k:'effect', q:'Which effect must the study detect?', type:'choice', def:'main', opts:[['main','A main effect (each intervention on its own)'],['int','The interaction (whether the two combine)']], rerender:true, h:'Main effects use all units. An interaction of the same size needs four times as many (continuous outcome).'},
+    fields: v => [{k:'effect', q:'Which effect must the study detect?', type:'choice', def:'main', opts:[['main','A main effect (each intervention alone)'],['int','The interaction (whether the two combine)']], rerender:true, h:'Main effects use all units. An interaction of the same size needs four times as many (continuous outcome).'},
       ...((v.effect || 'main') === 'main' ? r1Fields(v, {twoArm: true, nq:'How many units can be included in total, across all four groups?'}) :
         v.outcome === 'bin' ? r5BinFields(v) : [ ...(v.mode === 'mde' ? [F.N('How many units can be included in total, across all four groups?', 'Split equally across the four groups.', 8)] : []), F.sd(), ...(v.mode === 'n' ? [F.delta('Smallest interaction worth detecting (difference between the two effects)')] : []), F.r2(), ...((v.r2 || 0) > 0 ? [F.q()] : []), F.attr(), F.alpha(), F.power()])],
     compute: v => { if ((v.effect || 'main') === 'main') { const r = r1Compute(v, {twoArm: true}); if (r.err) return r; r.notes.push('Each main effect compares all units with and without that intervention, assuming no interaction.'); return r; }
@@ -952,17 +952,17 @@ const CD = {
       res.how = 'Interaction = difference between the two effects; Var = 16σ²(1 − R²)/N; noncentral t with N − 4 − covariates df.'; res.lab = 'E'; return res; }},
   R6: {outcomes: true,
     fields: v => [ ...(v.mode === 'mde' ? [F.N('How many units can be included in total?', 'Half are encouraged at random.')] : []),
-      F.share('u1', 'Expected take-up among those encouraged', 'Percentage who take up the intervention when encouraged.'), F.share('u0', 'Expected take-up among those not encouraged', 'Percentage who take it up anyway.'),
-      ...r1Fields({...v, mode: v.mode === 'mde' ? 'skipN' : v.mode}, {twoArm: true, noEst: true, ppq:'Smallest effect worth detecting among those who take it up due to the encouragement (pp)', dq:'Smallest effect worth detecting among those who take it up due to the encouragement'})],
+      F.share('u1', 'Expected take-up among those encouraged', 'Percentage who take up the intervention when encouraged.'), F.share('u0', 'Expected take-up among those not encouraged', 'Percentage who take up the intervention anyway.'),
+      ...r1Fields({...v, mode: v.mode === 'mde' ? 'skipN' : v.mode}, {twoArm: true, noEst: true, ppq:'Smallest effect worth detecting among those who take up the intervention due to the encouragement (pp)', dq:'Smallest effect worth detecting among those who take up the intervention due to the encouragement'})],
     compute: v => { const du = (v.u1 - v.u0)/100; if (!(du > 0)) return {err:'Take-up must be higher among those encouraged.'};
-      if (v.mode === 'n') { const r = r1Compute(v, {twoArm: true, scale: du}); if (r.err) return r; r.rows.push(['Effect of the encouragement itself', v.outcome === 'bin' ? fX(v.pp*du) + ' pp' : fX(v.delta*du)]); r.how = 'Effect among compliers × take-up difference = effect of encouragement, sized as a two-arm RCT; equivalent to dividing the RCT sample by the squared take-up difference. ' + r.how; r.notes.push('The effect among compliers relies on encouragement affecting the outcome only through take-up, and on no one being put off by it.'); return r; }
+      if (v.mode === 'n') { const r = r1Compute(v, {twoArm: true, scale: du}); if (r.err) return r; r.rows.push(['Effect of the encouragement itself', v.outcome === 'bin' ? fX(v.pp*du) + ' pp' : fX(v.delta*du)]); r.how = 'Effect among compliers × take-up difference = effect of encouragement, sized as a two-arm RCT; equivalent to dividing the RCT sample by the squared take-up difference. ' + r.how; r.notes.push('The effect among compliers relies on encouragement affecting the outcome only through take-up, and on no one being put off by the encouragement.'); return r; }
       const r = r1Compute({...v, estimand: 'rd'}, {twoArm: true}); if (r.err) return r; const m = r.raw;
       r.main = v.outcome === 'bin'
         ? [['Minimum detectable increase among compliers', isFinite(m.up) ? '+' + fX(100*m.up/du) + ' pp' : 'not detectable', isFinite(m.up) ? `effect of the encouragement itself: +${fX(100*m.up)} pp` : ''],
            ['Minimum detectable decrease among compliers', isFinite(m.down) ? '\u2212' + fX(100*m.down/du) + ' pp' : 'not detectable', isFinite(m.down) ? `effect of the encouragement itself: \u2212${fX(100*m.down)} pp` : '']]
         : [['Minimum detectable effect among compliers', fX(m.delta/du) + (v.sd === 1 ? ' SD' : ''), `effect of the encouragement itself: ${fX(m.delta)}${v.sd === 1 ? ' SD' : ''}`]];
       r.rows.push(['Take-up difference', fX(100*du) + ' pp']); r.how = 'MDE of the encouragement (two-arm RCT) divided by the take-up difference. ' + r.how; return r; }},
-  R7: {outcomes: true, fields: v => r1Fields(v), compute: v => { const r = r1Compute(v); if (r.err) return r; r.warns.push('This is the fixed-design result. Interim analyses increase the maximum sample size by an amount set by the stopping boundary and the number of looks; compute that in dedicated group-sequential software.'); return r; }},
+  R7: {outcomes: true, fields: v => r1Fields(v), compute: v => { const r = r1Compute(v); if (r.err) return r; r.warns.push('The result above is for a fixed design. Interim analyses increase the maximum sample size by an amount set by the stopping boundary and the number of looks; compute the maximum sample size in dedicated group-sequential software.'); return r; }},
   Q1: {outcomes: true,
     fields: v => [ ...(v.mode === 'mde' ? [F.N('How many units are in the panel?', 'Treated and comparison units observed in every period.')] : []),
       F.share('share', 'Share of units that are treated', 'For example 50%.', 50),
@@ -980,7 +980,7 @@ const CD = {
   Q2: {modes: null, fields: () => [{k:'donors', q:'How many untreated units are in the donor pool?', h:'Units that could form the synthetic comparison.', min:1, max:1e5, int:true}, F.alpha()],
     compute: v => { const pmin = 1/(v.donors + 1), need = Math.ceil(1/v.alpha - 1 - 1e-9), res = {main: [['Smallest attainable p-value', fX(pmin), 'placebo (permutation) test with one treated unit']], rows: [['Donor units needed to reach alpha ' + fX(v.alpha), fN(need)]], notes: [], warns: []};
       if (pmin > v.alpha) res.warns.push(`With ${v.donors} donors the test can never reach p ≤ ${fX(v.alpha)}, whatever the effect size.`);
-      res.notes.push('There is no closed-form minimum detectable effect. Run a placebo simulation on the pre-period data: apply the method to each donor as if it were treated and compare the gaps.');
+      res.notes.push('There is no closed-form minimum detectable effect. Run a placebo simulation on the pre-period data: apply the method to each donor as if the donor were treated and compare the gaps.');
       res.how = 'With one treated unit and J donors, placebo inference ranks J + 1 gaps, so the smallest p-value is 1/(J + 1).'; res.lab = 'E'; return res; }},
   Q3: {outcomes: true,
     fields: v => [ ...(v.mode === 'mde' ? [F.N('How many observations fall within the bandwidth around the cut-off?', 'Both sides together. If unsure, count those within a plausible window either side.')] : []),
@@ -995,8 +995,8 @@ const CD = {
       if (v.outcome === 'bin') res.notes.push(BIN_APPROX);
       res.warns.push('Planning value only. Data-driven bandwidths and robust bias-corrected confidence intervals usually need more observations; confirm with rdpower (Cattaneo, Titiunik and Vazquez-Bare).');
       res.how = `Local linear fit on each side with the score evenly spread within the bandwidth: Var = ${CK}σ²(1/nₐ + 1/nᵇ)/jump² (${CK} = boundary variance constant for the ${v.kernel || 'triangular'} kernel, computed numerically).`; res.lab = 'I'; return res; }},
-  Q4: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest change it can detect'], n: ['No, still planning', 'Show how many points after the change are needed']}, fields: v => itsFields(v, false), compute: v => itsCompute(v, false)},
-  Q5: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest change it can detect'], n: ['No, still planning', 'Show how many points after the change are needed']}, fields: v => itsFields(v, true), compute: v => itsCompute(v, true)},
+  Q4: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest change the series can detect'], n: ['No, still planning', 'Show how many points after the change are needed']}, fields: v => itsFields(v, false), compute: v => itsCompute(v, false)},
+  Q5: {outcomes: ['cont'], modes: {mde: ['Yes, the series is fixed', 'Show the smallest change the series can detect'], n: ['No, still planning', 'Show how many points after the change are needed']}, fields: v => itsFields(v, true), compute: v => itsCompute(v, true)},
   Q6: {outcomes: true, fields: v => sooFields(v), compute: v => sooCompute(v)},
   O1: {outcomes: true, fields: v => sooFields(v), compute: v => sooCompute(v)},
   Q7: {outcomes: true,
@@ -1017,7 +1017,7 @@ const CD = {
     fields: v => [ ...(v.mode === 'mde' ? [F.N('How many eligible units are there in the periods when some were held back?', 'Use only periods with a held-back group.')] : []),
       F.share('hold', 'Share of those eligible units that were held back', 'For example 20%.'),
       F.r2(), ...((v.r2 || 0) > 0 ? [F.q()] : []),
-      {k:'ess', q:'Effective sample size ratio after weighting', h:'1 if no weighting. Weighting to balance treated and held-back cases usually lowers it (for example 0.7).', def:1, min:0.05, max:1},
+      {k:'ess', q:'Effective sample size ratio after weighting', h:'1 if no weighting. Weighting to balance treated and held-back cases usually lowers the ratio (for example 0.7).', def:1, min:0.05, max:1},
       ...outFields(v), F.alpha(), F.power()],
     compute: v => { const h = v.hold/100, q = (v.r2 || 0) > 0 ? (v.q || 1) : 0, res = {main: [], rows: [], notes: [], warns: []};
       const o = {type: v.outcome, delta: v.delta, sd: v.sd, p0: v.p0/100, pp: v.pp, vf: (1 - v.r2)/v.ess, alpha: v.alpha, power: v.power/100};
@@ -1038,7 +1038,7 @@ const CD = {
       else { const m = E.cohortMde(v.alpha, v.power/100, p, I0, v.N); res.main.push(['Smallest detectable hazard ratio above 1', isFinite(m.up) ? fX(m.up) : 'not detectable', ''], ['Smallest detectable hazard ratio below 1', isFinite(m.down) ? fX(m.down) : 'not detectable', '']); }
       res.notes.push('No adjustment for confounding is included; adjusted analyses usually need more people.');
       res.how = 'Events d = (z₁₋α/₂ + z₁₋β)² / (p(1 − p)(ln HR)²) (Schoenfeld); people = d / probability of an event, with exposed incidence 1 − (1 − I₀)^HR under proportional hazards.'; res.lab = 'E'; return res; }},
-  O3: {modes: {mde: ['Yes, the cases are fixed', 'Show the smallest odds ratio they can detect'], n: MODE_DEFAULT.n},
+  O3: {modes: {mde: ['Yes, the cases are fixed', 'Show the smallest odds ratio the cases can detect'], n: MODE_DEFAULT.n},
     fields: v => [ ...(v.mode === 'mde' ? [F.N('How many cases are available?', 'People with the outcome.', 2)] : []),
       {k:'kc', q:'Controls per case', h:'Little is gained beyond 4.', def:1, min:1, max:20, int:true},
       {k:'pexp', q:'Percentage of controls who are exposed', h:'From the source population.', min:0.01, max:99.99, unit:'%'},
@@ -1055,7 +1055,7 @@ const CD = {
       ...((v.measure || 'prop') === 'prop' ? [{k:'p', q:'Expected percentage', h:'50% gives the largest (safest) sample size.', def:50, min:0.01, max:99.99, unit:'%'}, ...(v.mode === 'n' ? [{k:'margin', q:'Required margin of error', h:'Half the width of the confidence interval, in percentage points. For example 3.', min:0.01, max:50, unit:'pp'}] : [])]
         : [F.sd('From earlier data on the same measure.'), ...(v.mode === 'n' ? [{k:'margin', q:'Required margin of error', h:'Half the width of the confidence interval, in the measure’s units.', min:1e-9, max:1e12}] : [])]),
       {k:'deff', q:'Survey design effect', h:'1 for simple random sampling; higher for clustered or weighted samples.', def:1, min:0.1, max:50},
-      {k:'Npop', q:'Population size (optional)', h:'Leave blank for a large population. Used only if the sample is more than 5% of it.', opt:true, min:2, max:1e12, int:true}, F.conf()],
+      {k:'Npop', q:'Population size (optional)', h:'Leave blank for a large population. Used only if the sample is more than 5% of the population.', opt:true, min:2, max:1e12, int:true}, F.conf()],
     compute: v => { const z = E.zA(v.alpha), prop = (v.measure || 'prop') === 'prop', vr = prop ? (v.p/100)*(1 - v.p/100) : v.sd*v.sd, res = {main: [], rows: [], notes: [], warns: []};
       if (v.mode === 'n') { const r = E.surveyN(z, vr, v.deff, prop ? v.margin/100 : v.margin, v.Npop); res.main.push(['Responses needed', fN(r.n), r.fpc ? `${fN(r.n0)} before the finite population correction` : '']); if (v.Npop && r.n > v.Npop) res.warns.push('More responses than the population: take a census.'); }
       else { if (v.Npop && v.N > v.Npop) return {err:'The sample is larger than the population.'}; const r = E.surveyMargin(z, vr, v.deff, v.N, v.Npop); res.main.push(['Margin of error', prop ? '±' + fX(100*r.e) + ' pp' : '±' + fX(r.e), `${fX(100*(1 - v.alpha))}% confidence${r.fpc ? ', with finite population correction' : ''}`]); }
@@ -1078,7 +1078,7 @@ const CD = {
       else { const wa = z*Math.sqrt(se*(1 - se)/(v.N*pv)), wb = z*Math.sqrt(sp*(1 - sp)/(v.N*(1 - pv)));
         res.main.push(['Sensitivity half-width', '±' + fX(100*wa) + ' pp', `${fN(v.N*pv - 1e-9)} expected with the condition`], ['Specificity half-width', '±' + fX(100*wb) + ' pp', `${fN(v.N*(1 - pv) - 1e-9)} expected without`]); }
       res.notes.push('Wald intervals; near 0% or 100% use exact or Wilson intervals, which are wider on one side.');
-      res.how = 'Buderer approach: people with the condition = z² Se(1 − Se)/w², total = that / prevalence; the same for specificity with 1 − prevalence; take the larger.'; res.lab = 'E'; return res; }},
+      res.how = 'Buderer approach: people with the condition = z² Se(1 − Se)/w², total = people with the condition / prevalence; the same for specificity with 1 − prevalence; take the larger.'; res.lab = 'E'; return res; }},
   P4: {outcomes: true,
     fields: v => [{k:'unit', q:'How is the model’s use allocated?', type:'choice', def:'ind', opts:[['ind','To individuals'],['clu','To clusters (for example sites or teams)']], rerender:true}, ...((v.unit || 'ind') === 'ind' ? r1Fields(v, {twoArm: true}) : r2Fields(v))],
     compute: v => (v.unit || 'ind') === 'ind' ? r1Compute(v, {twoArm: true}) : r2Compute(v)},
@@ -1089,8 +1089,8 @@ function itsFields(v, comp){
     ...(v.mode === 'mde' ? [{k:'n1', q:'Number of time points after the change', h:'', min:1, max:2000, int:true}] : []),
     {k:'change', q:'Which change must be detected?', type:'choice', def:'level', opts:[['level','A step change in level'],['slope','A change in trend (per time point)']], rerender:true},
     {k:'phi', q:'Lag-1 autocorrelation of the residuals', h:'Correlation between consecutive residuals. 0 means none.', def:0, min:-0.9, max:0.95},
-    ...(comp ? [{k:'rs', q:'Correlation between the treated and comparison series', h:'Correlation of their residuals over the same periods.', min:-0.99, max:0.99}] : []),
-    F.sd('SD of the ' + (comp ? 'treated ' : '') + 'series around its trend. Leave at 1 for results in SD units.'),
+    ...(comp ? [{k:'rs', q:'Correlation between the treated and comparison series', h:'Correlation of the residuals of the two series over the same periods.', min:-0.99, max:0.99}] : []),
+    F.sd('SD of the ' + (comp ? 'treated ' : '') + 'series around the trend line. Leave at 1 for results in SD units.'),
     ...(v.mode === 'n' ? [F.delta(v.change === 'slope' ? 'Smallest change in trend worth detecting (per time point)' : 'Smallest step change worth detecting')] : []), F.alpha(), F.power()];
 }
 function itsCompute(v, comp){
@@ -1101,13 +1101,13 @@ function itsCompute(v, comp){
   else { const m = z*se(v.n1); res.main.push([j ? 'Minimum detectable change in trend' : 'Minimum detectable step change', fX(m) + (v.sd === 1 ? ' SD' : ''), j ? 'per time point' : 'at the first point after the change']); }
   if (v.n0 < 8) res.warns.push('Fewer than 8 points before the change: the pre-change trend is poorly estimated.');
   if (comp) res.notes.push('Analysed as the difference between the treated and comparison series, assuming equal residual SDs and the same autocorrelation.');
-  res.notes.push('Assumes the autocorrelation is known. With short series it is estimated imprecisely, so check with simulation (for example the tools in Beard, Brown and Shahab 2025). Seasonality is not modelled.');
+  res.notes.push('Assumes the autocorrelation is known. With short series the autocorrelation is estimated imprecisely, so check with simulation (for example the tools in Beard, Brown and Shahab 2025). Seasonality is not modelled.');
   res.how = 'Segmented regression (level, trend, step, trend change) with AR(1) errors; generalised least squares variance; MDE = (z₁₋α/₂ + z₁₋β) × SE.'; res.lab = comp ? 'I' : 'V'; return res;
 }
 function sooFields(v){
   return [ ...(v.mode === 'mde' ? [F.N('How many units are available?', 'Treated and untreated together.')] : []),
     F.share('share', 'Share of units that are treated', '', 50),
-    {k:'ess', q:'Effective sample size ratio after weighting or matching', h:'Effective sample size divided by the actual one. 0.7 is a planning assumption; estimate it from a pilot propensity model where possible.', def:0.7, min:0.05, max:1},
+    {k:'ess', q:'Effective sample size ratio after weighting or matching', h:'Effective sample size divided by the actual one. 0.7 is a planning assumption; estimate the ratio from a pilot propensity model where possible.', def:0.7, min:0.05, max:1},
     {k:'trim', q:'Share of units dropped for lack of overlap', h:'Units with no comparable counterpart in the other group.', def:0, min:0, max:90, unit:'%'},
     F.r2(), ...outFields(v), F.alpha(), F.power()];
 }
@@ -1126,8 +1126,8 @@ function r5BinFields(v){
   const est = v.estimand || 'rd';
   return [ ...(v.mode === 'mde' ? [F.N('How many units can be included in total, across all four groups?', 'Split equally across the four groups.', 8)] : []),
     F.p0('Expected percentage with the outcome with neither intervention'),
-    {k:'pa', q:'Effect of intervention A on its own (percentage points)', h:'Change from the neither group when only A is given. 0 if unknown.', def:0, min:-99.98, max:99.98, unit:'pp'},
-    {k:'pb', q:'Effect of intervention B on its own (percentage points)', h:'Change from the neither group when only B is given. 0 if unknown.', def:0, min:-99.98, max:99.98, unit:'pp'},
+    {k:'pa', q:'Effect of intervention A alone (percentage points)', h:'Change from the neither group when only A is given. 0 if unknown.', def:0, min:-99.98, max:99.98, unit:'pp'},
+    {k:'pb', q:'Effect of intervention B alone (percentage points)', h:'Change from the neither group when only B is given. 0 if unknown.', def:0, min:-99.98, max:99.98, unit:'pp'},
     {k:'estimand', q:'Scale on which the interaction is tested', type:'choice', def:'rd', opts:[['rd','Percentage points (additive)'],['or','Odds ratio (logistic regression)'],['rr','Risk ratio']], rerender:true, h:'An interaction can be present on one scale and absent on another, so choose the scale of the analysis.'},
     ...(v.mode === 'n' ? [est === 'rd' ? {k:'pp', q:'Smallest interaction worth detecting (percentage points)', h:'Extra change in the combined group beyond A’s and B’s separate effects added together. Positive or negative.', min:-99.98, max:99.98, unit:'pp', nz:true}
       : est === 'rr' ? {k:'rr', q:'Smallest interaction worth detecting (ratio of risk ratios)', h:'Risk ratio for A when B is given, divided by the risk ratio for A without B. For example 1.3 or 0.75.', min:0.01, max:100, ne1:true}
@@ -1165,7 +1165,7 @@ CD.G0 = {outcomes: true,
   compute: v => { const r = r1Compute({...v, k: 2, ratio: (100 - v.share)/v.share}); if (r.err) return r;
     const ren = x => String(x).replace('Control arm', 'Comparison group').replace('Treatment arm', 'Group of interest').replace('control ', 'comparison ').replace('treatment ', 'group of interest ');
     r.rows = r.rows.map(([a, b]) => [ren(a), ren(b)]);
-    r.notes.unshift('Assumes independent units and a fair comparison, as in a two-arm randomised trial. The chosen design changes this; see below.');
+    r.notes.unshift('Assumes independent units and a fair comparison, as in a two-arm randomised trial. The chosen design changes these assumptions; see below.');
     r.how = r.how.replace('Same engine as the RCT sample size calculator.', 'Same engine as the RCT sample size calculator (two groups).'); return r; }};
 const DESIGN_CHANGE = [
   ['R2', '× design effect 1 + ((CV² + 1)m − 1)ICC (m = cluster size)', 'E'],
@@ -1190,7 +1190,7 @@ const DESIGN_CHANGE = [
 // designs with no built-in calculation
 const CALC_LINK = {
   P2: 'Sample size for developing a prediction model depends on the number of candidate predictor parameters, the outcome prevalence and the anticipated Cox–Snell R² or C-statistic (Riley et al. 2025). Use pmsampsize.',
-  P3: 'Sample size for external validation targets the precision of calibration, discrimination and net benefit (Riley et al. 2024). It needs the anticipated C-statistic, prevalence and the distribution of the linear predictor. Use pmvalsampsize.'
+  P3: 'Sample size for external validation targets the precision of calibration, discrimination and net benefit (Riley et al. 2024). The calculation needs the anticipated C-statistic, prevalence and the distribution of the linear predictor. Use pmvalsampsize.'
 };
 // Safety net for every design: a result that would show NaN, Infinity or a bare dash becomes a clear message.
 const NO_FINITE = 'No finite result for these inputs: the effect is too small for a realistic sample, or an input is at an extreme value. Check the effect size, the SD and any percentages.';
@@ -1202,11 +1202,11 @@ for (const spec of Object.values(CD)) { const raw = spec.compute; spec.compute =
 // Key lookup: "<design>.<field>" first, then "<field>".
 const EXPLAIN = {
   // choices at the top
-  cq_mode: ["If the number of units is fixed, the calculator shows the smallest effect that sample can detect with the chosen power (the minimum detectable effect). If it can still be decided, it shows how many units the effect of interest needs.",
+  cq_mode: ["If the number of units is fixed, the calculator shows the smallest effect that sample can detect with the chosen power (the minimum detectable effect). If the number of units can still be decided, the calculator shows how many units the effect of interest needs.",
     "Records for 5,000 people are already held: answer Yes. A new trial is being set up and can invite as many people as needed: answer No."],
   cq_out: ["Continuous: each unit has a number and averages are compared. Binary: each unit is a yes or a no and percentages are compared.",
     "Minutes taken to complete a form is continuous (average 12 minutes versus 10). Whether a person replied to a letter is binary (20% replied versus 25%)."],
-  design: ["The planned study design. If it is not decided, keep the basic comparison of two groups: it assumes two separate groups of independent units, as in a simple randomised trial. The table further down shows how each other design would change the answer.",
+  design: ["The planned study design. If the design is not decided, keep the basic comparison of two groups, which assumes two separate groups of independent units, as in a simple randomised trial. The table further down shows how each other design would change the answer.",
     "Whether to randomise people or whole offices is not yet decided: start with the basic comparison, then look at the cluster RCT row."],
   // sample
   N: ["The number of units that can be included. A unit is whatever receives the intervention and is measured: a person, a business, a school.",
@@ -1215,11 +1215,11 @@ const EXPLAIN = {
     "40 offices, 20 of which will get the new process: enter 40."],
   "P4.N": ["The number of units that can be included. If the model is allocated to clusters, enter the number of clusters across both arms.",
     "300 people, or 30 teams if whole teams are allocated."],
-  "R3.N": ["The number of clusters, such as offices or schools. All of them start without the intervention and switch to it in groups over time.",
+  "R3.N": ["The number of clusters, such as offices or schools. All clusters start without the intervention and switch to the intervention in groups over time.",
     "12 offices that will all adopt the new process at some point: enter 12."],
   "R4.N": ["The number of people who will receive both conditions, one after the other, in random order.",
     "60 people each try both the old and the new form, half in each order: enter 60."],
-  "Q3.N": ["Observations whose score falls inside the window around the cut-off used in the analysis. Only these count.",
+  "Q3.N": ["Observations whose score falls inside the window around the cut-off used in the analysis. Only observations inside the window count.",
     "The cut-off is 70, the window is 60 to 80, and 1,200 people scored in that range: enter 1200."],
   "Q8.N": ["Eligible units in the periods when some eligible units were held back. Periods without a held-back group are left out.",
     "Holdback happened in 6 of 12 months, and 4,000 eligible cases arrived in those 6 months: enter 4000."],
@@ -1238,42 +1238,42 @@ const EXPLAIN = {
   ratio: ["How many control units there are for each unit in a treatment arm.",
     "1 means equal groups (500 and 500). 2 means twice as many in control (1,000 control and 500 treated)."],
   adjust: ["With several treatment arms each compared with control, the chance of at least one false positive grows. An adjustment makes each test stricter so the overall chance stays at alpha.",
-    "With 3 comparisons, Bonferroni tests each at 0.05 / 3 = 0.017. Dunnett is a little less strict, as it accounts for the shared control group. None applies no adjustment."],
+    "With 3 comparisons, Bonferroni tests each at 0.05 / 3 = 0.017. Dunnett, which accounts for the shared control group, is a little less strict. None applies no adjustment."],
   estimand: ["How the difference between groups is expressed and tested in the analysis.",
     "20% versus 25%: the difference is 5 percentage points; the risk ratio is 25 / 20 = 1.25; the odds ratio is (25/75) / (20/80) = 1.33."],
   "R5.estimand": ["For the interaction, the scale matters: two interventions can add up exactly on the percentage-point scale but not on the odds ratio scale, or the other way round. Choose the scale of the analysis.",
     "Neither 20%, A alone 30%, B alone 30%, both 40%: on the percentage-point scale there is no interaction (+10 and +10 would give 40%), but on the odds ratio scale there is one (the ratio of odds ratios is 0.91)."],
   // outcome values
-  p0: ["The expected percentage in the comparison group, that is without the intervention. Take it from recent data on the same population.",
+  p0: ["The expected percentage in the comparison group, that is without the intervention. Take the percentage from recent data on the same population.",
     "Last year 20 of every 100 people replied to the letter: enter 20."],
   "R5.p0": ["The expected percentage among units that receive neither intervention.",
     "Without the letter or the phone call, 20 of every 100 people reply: enter 20."],
-  pp: ["The smallest change worth detecting, as the plain difference between two percentages (percentage points). It is not the relative change.",
+  pp: ["The smallest change worth detecting, as the plain difference between two percentages (percentage points), not the relative change.",
     "From 20% to 23% is 3 percentage points (a 15% relative increase). Enter 3, or −3 for a fall."],
-  "R5.pp": ["The extra change when both interventions are given, beyond what their separate effects would add up to.",
+  "R5.pp": ["The extra change when both interventions are given, beyond the sum of the two separate effects.",
     "Neither 20%, A alone 25% (+5), B alone 25% (+5). Adding the effects predicts 30% for both; if both together give 35%, the interaction is +5."],
   rr: ["Risk ratio: the percentage in the intervention group divided by the percentage in the comparison group.",
     "25% versus 20% is 1.25 (25% higher). 15% versus 20% is 0.75."],
   "R5.rr": ["Ratio of risk ratios: A’s risk ratio when B is also given, divided by A’s risk ratio without B. 1 means no interaction.",
-    "A raises the rate by a factor of 1.25 on its own but by 1.5 when B is given: 1.5 / 1.25 = 1.2."],
-  or: ["Odds ratio: compares odds, where odds = chance it happens divided by chance it does not.",
+    "A alone raises the rate by a factor of 1.25, but by 1.5 when B is also given: 1.5 / 1.25 = 1.2."],
+  or: ["Odds ratio: compares odds, where odds = chance the outcome occurs divided by chance the outcome does not occur.",
     "25% has odds 25/75 = 0.33; 20% has odds 20/80 = 0.25; the odds ratio is 0.33 / 0.25 = 1.33."],
-  "R5.or": ["Ratio of odds ratios: A’s odds ratio when B is also given, divided by A’s odds ratio without B. 1 means no interaction. This is the interaction term in a logistic regression.",
+  "R5.or": ["Ratio of odds ratios: A’s odds ratio when B is also given, divided by A’s odds ratio without B. 1 means no interaction. The ratio of odds ratios is the interaction term in a logistic regression.",
     "A’s odds ratio is 1.3 without B and 1.95 with B: 1.95 / 1.3 = 1.5."],
   "O3.or": ["How much more common the exposure is among cases than among controls, as an odds ratio.",
     "33% of cases and 20% of controls were exposed: odds of 33/67 = 0.49 against 20/80 = 0.25, an odds ratio of 1.97."],
-  sd: ["How spread out the outcome is between units (roughly the typical distance from the average). Leave it at 1 to work in standard deviation (SD) units.",
+  sd: ["How spread out the outcome is between units (roughly the typical distance from the average). Leave the SD at 1 to work in standard deviation (SD) units.",
     "Scores average 60 and two-thirds of people score between 45 and 75: the SD is 15. In SD units, an effect of 0.2 means 0.2 × 15 = 3 points."],
-  "Q4.sd": ["How far the series typically sits above or below its trend line. Leave it at 1 to get results in SD units.",
-    "Monthly counts follow a smooth trend but typically sit 5 above or below it: enter 5."],
-  "Q5.sd": ["How far the treated series typically sits above or below its trend line. Leave it at 1 to get results in SD units.",
-    "Monthly counts follow a smooth trend but typically sit 5 above or below it: enter 5."],
-  "O4.sd": ["How spread out the measure is between people. Take it from an earlier survey of the same measure.",
+  "Q4.sd": ["How far the series typically sits above or below the trend line. Leave the SD at 1 to get results in SD units.",
+    "Monthly counts follow a smooth trend but typically sit 5 above or below the trend: enter 5."],
+  "Q5.sd": ["How far the treated series typically sits above or below the trend line. Leave the SD at 1 to get results in SD units.",
+    "Monthly counts follow a smooth trend but typically sit 5 above or below the trend: enter 5."],
+  "O4.sd": ["How spread out the measure is between people. Take the SD from an earlier survey of the same measure.",
     "Weekly hours average 30 and two-thirds of people report 20 to 40: the SD is 10."],
   delta: ["The smallest difference in averages between the groups that would matter in practice.",
-    "If the new form cuts the average completion time from 12 to 11 minutes and that would matter, enter 1. With the SD left at 1, enter the effect in SD units, for example 0.2."],
+    "If cutting the average completion time from 12 to 11 minutes with the new form would matter, enter 1. With the SD left at 1, enter the effect in SD units, for example 0.2."],
   "R5.delta": ["How much the effect of one intervention changes when the other is also given (a difference of differences).",
-    "The letter saves 2 minutes on its own but 3 minutes when the call is also made: the interaction is 1."],
+    "The letter alone saves 2 minutes, but 3 minutes when the call is also made: the interaction is 1."],
   "R6.delta": ["The effect among people who take up the intervention due to the encouragement (compliers), not among everyone invited.",
     "Joining the program raises the average score by 5 points for those who join due to the invitation: enter 5."],
   "R6.pp": ["The effect, in percentage points, among people who take up the intervention due to the encouragement (compliers).",
@@ -1284,22 +1284,22 @@ const EXPLAIN = {
     "Step: from 100 a month to 110 is 10. Trend: growth of 2 a month becoming 4 a month is 2."],
   "Q5.delta": ["For a step change: how much the treated series jumps relative to the comparison series. For a trend change: how much the difference in slopes changes per time point.",
     "The treated region rises by 10 a month more than the comparison region right after the change: enter 10."],
-  r2: ["How much of the variation in the outcome can be predicted from information collected before the intervention, such as last year’s value. Using it in the analysis removes noise, so fewer units are needed. For yes/no outcomes the gain is usually smaller, so be cautious.",
+  r2: ["How much of the variation in the outcome can be predicted from information collected before the intervention, such as last year’s value. Using that information in the analysis removes noise, so fewer units are needed. For yes/no outcomes the gain is usually smaller, so be cautious.",
     "Last year’s score predicts this year’s with a correlation of 0.6: R² = 0.6 × 0.6 = 0.36, and the sample needed falls by 36%."],
-  q: ["How many background variables go into the analysis model. It only changes the result slightly.",
+  q: ["How many background variables go into the analysis model. The number of variables changes the result only slightly.",
     "Adjusting for last year’s score and age: enter 2."],
-  attr: ["The expected share of units lost before the outcome is measured. When planning, the calculator recruits extra to make up for it; with a fixed sample, it reduces the number analysed.",
+  attr: ["The expected share of units lost before the outcome is measured. When planning, the calculator recruits extra units to make up for the loss; with a fixed sample, the loss reduces the number analysed.",
     "1,000 people recruited and 100 cannot be followed up: enter 10."],
   alpha: ["The accepted risk of concluding there is an effect when there is none (a false positive).",
-    "0.05 means that if the intervention truly did nothing, a study like this would wrongly show an effect in 1 study in 20 on average."],
+    "0.05 means that if the intervention truly did nothing, such a study would wrongly show an effect in 1 study in 20 on average."],
   "O4.alpha": ["One minus the confidence level of the reported interval.",
     "0.05 gives a 95% confidence interval: if the survey were repeated many times, 95 of every 100 intervals would contain the true value on average."],
   "P1.alpha": ["One minus the confidence level of the intervals for sensitivity and specificity.",
     "0.05 gives 95% confidence intervals."],
   "Q2.alpha": ["The planned p-value threshold.",
-    "0.05: with fewer than 19 donor units, no result can reach it."],
-  power: ["The chance that the study detects the effect if it really is the size entered.",
-    "80% means that if the same study were run 10 times, on average 8 would show a clear effect and 2 would miss it."],
+    "0.05: with fewer than 19 donor units, no result can reach 0.05."],
+  power: ["The chance that the study detects the effect if the effect really is the size entered.",
+    "80% means that if the same study were run 10 times, on average 8 would show a clear effect and 2 would miss the effect."],
   // cluster designs
   m: ["The average number of individuals with outcome data in each cluster.",
     "25 students are measured in each class: enter 25."],
@@ -1309,12 +1309,12 @@ const EXPLAIN = {
     "Classes of 20, 25 and 30 students: average 25, SD 5, so the CV is 5 / 25 = 0.2."],
   icc: ["How alike units in the same cluster are, from 0 (no more alike than strangers) to 1 (identical). Small values still matter when clusters are large.",
     "An ICC of 0.05 with 20 people per cluster multiplies the sample needed by 1 + 19 × 0.05 = 1.95."],
-  steps: ["In a stepped-wedge design all clusters start without the intervention and groups of clusters switch to it at set times. Steps = the number of switch points.",
-    "12 offices switch 3 at a time every 3 months: 4 steps, and 5 periods including the first one when no office has it."],
+  steps: ["In a stepped-wedge design all clusters start without the intervention and groups of clusters switch to the intervention at set times. Steps = the number of switch points.",
+    "12 offices switch 3 at a time every 3 months: 4 steps, and 5 periods including the first period, when no office has the new process."],
   cac: ["How stable each cluster’s true average is from one period to the next, from 0 to 1. 1 means a cluster that is above average stays exactly as far above average in every period.",
     "An office whose average is consistently high every quarter is close to 1; one that is high in some quarters and ordinary in others is lower, say 0.5."],
   // within-person and over-time correlations
-  rho: ["A correlation between two measurements of the same unit, from 0 to 1. The higher it is, the more each unit acts as its own comparison and the fewer units are needed.",
+  rho: ["A correlation between two measurements of the same unit, from 0 to 1. The higher the correlation, the more the comparison happens within units and the fewer units are needed.",
     "People who score high on the first measurement usually score high on the second: for example 0.7."],
   "R4.rho": ["How similar each person’s results are under the two conditions.",
     "People who are fast with the old form are usually fast with the new one too: for example 0.7."],
@@ -1323,7 +1323,7 @@ const EXPLAIN = {
   "O5.rho": ["How similar each unit’s before and after measurements are.",
     "People who scored high before mostly score high after: for example 0.6."],
   // factorial and encouragement
-  effect: ["Main effect: does each intervention work on its own, averaged over the other? Interaction: does one work differently when the other is also given?",
+  effect: ["Main effect: does each intervention work, averaged over the other intervention? Interaction: does one intervention work differently when the other is also given?",
     "Letter (A) and phone call (B). Main effect: does the letter help? Interaction: does the letter help less when people also get a call?"],
   pa: ["The change from the ‘neither’ group when only intervention A is given.",
     "Neither 20%, letter only 25%: A’s effect is +5."],
@@ -1340,13 +1340,13 @@ const EXPLAIN = {
     "Monthly data for July to December after a July start: enter 6."],
   // synthetic control
   donors: ["Untreated units that can be combined to build a ‘synthetic’ copy of the treated unit.",
-    "One region changed its policy and 30 regions did not: enter 30."],
+    "One region changed policy and 30 regions did not: enter 30."],
   // regression discontinuity
   above: ["Of the observations near the cut-off, the share on the side that gets the intervention.",
-    "1,000 applicants scored within 10 points of the cut-off of 70 and 450 of them scored above it: enter 45."],
-  jump: ["How much more likely units just above the cut-off are to get the intervention than units just below. 100% means everyone above gets it and no one below does (a sharp design).",
+    "1,000 applicants scored within 10 points of the cut-off of 70 and 450 of those applicants scored above 70: enter 45."],
+  jump: ["How much more likely units just above the cut-off are to get the intervention than units just below. 100% means everyone above the cut-off gets the intervention and no one below does (a sharp design).",
     "10% are treated just below 70 and 70% just above: enter 60."],
-  kernel: ["How observations are weighted by their distance from the cut-off. Triangular counts those closest to the cut-off most; uniform counts everyone in the window equally. Triangular needs 20% more observations (variance constant 4.8 against 4).",
+  kernel: ["How observations are weighted by distance from the cut-off. Triangular counts those closest to the cut-off most; uniform counts everyone in the window equally. Triangular needs 20% more observations (variance constant 4.8 against 4).",
     "With a window of 60 to 80 and a cut-off of 70, triangular gives a score of 69 more weight than a score of 61."],
   // interrupted time series
   n0: ["The number of time points in the series before the change.",
@@ -1355,16 +1355,16 @@ const EXPLAIN = {
     "Monthly counts from January to December 2025: enter 12."],
   change: ["A step change is a jump in level right after the change. A trend change is a change in the slope.",
     "Step: from 100 a month to 120. Trend: growth of 2 a month becomes 4 a month."],
-  phi: ["How much each time point’s random noise carries over to the next, from −1 to 1. 0 means none. Positive values mean the series holds less information than its number of points suggests.",
+  phi: ["How much each time point’s random noise carries over to the next, from −1 to 1. 0 means none. Positive values mean the series holds less information than the number of points suggests.",
     "If an unusually high month tends to be followed by another high month, the autocorrelation is positive, for example 0.3."],
   rs: ["How closely the random ups and downs of the treated series move with those of the comparison series. Higher values make the comparison more precise.",
     "Two regions whose monthly figures rise and fall together: for example 0.7."],
   // observational adjustment
   ess: ["Weighting or matching makes the groups comparable but gives some units more influence than others, so the sample behaves like a smaller one. The ratio is the effective size divided by the actual size; 1 means no loss.",
     "1,000 units that give the same precision as 700 after weighting: enter 0.7."],
-  trim: ["The share of units dropped as nobody in the other group resembles them.",
-    "The largest businesses were all treated, so there is nothing to compare them with; dropping them removes 5% of units: enter 5."],
-  fs: ["How strongly the instrument shifts who gets treated: the share of variation in treatment that it explains (after other covariates). Weak instruments need very large samples.",
+  trim: ["The share of units dropped for having no similar unit in the other group.",
+    "The largest businesses were all treated, so no untreated business is comparable; dropping the largest businesses removes 5% of units: enter 5."],
+  fs: ["How strongly the instrument shifts who gets treated: the share of variation in treatment that the instrument explains (after other covariates). Weak instruments need very large samples.",
     "Half of cases are randomly given an early processing slot, which raises the chance of treatment from 30% to 70%: R² = 0.16."],
   hold: ["Of the eligible units in periods when holdback happened, the share that did not get the intervention for reasons unrelated to the case.",
     "1,000 eligible cases in those months and 200 were not processed due to a capacity limit: enter 20."],
@@ -1388,7 +1388,7 @@ const EXPLAIN = {
     "±3 percentage points means a result of 30% is reported as 27% to 33%."],
   deff: ["How much the sampling method inflates uncertainty compared with a simple random sample. 1 for simple random sampling.",
     "If sampling whole streets makes the estimate as uncertain as a simple random sample of half the size, the design effect is 2."],
-  Npop: ["The total number of units in the surveyed population. It only matters if the sample is more than 5% of it.",
+  Npop: ["The total number of units in the surveyed population. The population size only matters if the sample is more than 5% of the population.",
     "Surveying the staff of an organisation with 2,000 employees: enter 2000."],
   // diagnostic accuracy
   se: ["Sensitivity: of those who truly have the condition, the share the test correctly flags.",
@@ -1400,10 +1400,10 @@ const EXPLAIN = {
   hw: ["How precise each estimate should be, plus or minus.",
     "A half-width of 5 means a sensitivity of 85% is reported as 80% to 90%."],
   unit: ["Whether use of the model is allocated person by person, or to whole groups such as offices or teams.",
-    "Each caseworker either uses the risk score for all their cases or does not: choose clusters."],
+    "Each caseworker uses the risk score for every case or for none: choose clusters."],
   // comparison-table only
   bw: ["The share of units whose score falls inside the window around the cut-off. Units far from the cut-off do not count in a regression discontinuity design.",
-    "4,000 applicants in total, 1,000 of them within 10 points of the cut-off: enter 25."],
+    "4,000 applicants in total, 1,000 of the applicants within 10 points of the cut-off: enter 25."],
 };
 const explainFor = (id, k) => EXPLAIN[id + "." + k] || EXPLAIN[k];
 
@@ -1414,79 +1414,79 @@ const DESIGN_TEXT = {
   R1: {f: "Random allocation of individuals gives the most direct comparison.",
     what: "Individuals are randomly allocated to two or more arms and compared on one outcome window. Example: people due to renew a registration are randomised to a reminder text or no text, and on-time renewal is compared (60% expected without the text).",
     sel: "Offered for an effect question when allocation can be random, delivery is to individuals, the control group is unlikely to be exposed, and the intervention can be withheld or delayed.",
-    ass: "Random allocation, with outcome data lost at similar rates in each arm. Analysis by t-test, chi-square, ANCOVA, logistic regression or AIPW with baseline covariates. R2 replaces it when the control group is likely to be exposed.",
-    n: "Detecting a rise from 60% to 63% needs 8,258 people (4,129 per arm); baseline covariates explaining 20% of outcome variance (R² 0.2) reduce this to 6,606. Strong baseline predictors, such as the same outcome measured earlier, are therefore an efficient way to cut the sample, which scales with (1 − R²). (Same engine as the RCT calculator; label E.)"},
+    ass: "Random allocation, with outcome data lost at similar rates in each arm. Analysis by t-test, chi-square, ANCOVA, logistic regression or AIPW with baseline covariates. R2 replaces R1 when the control group is likely to be exposed.",
+    n: "Detecting a rise from 60% to 63% needs 8,258 people (4,129 per arm); baseline covariates explaining 20% of outcome variance (R² 0.2) reduce the sample to 6,606. Strong baseline predictors, such as the same outcome measured earlier, are therefore an efficient way to cut the sample, which scales with (1 − R²). (Same engine as the RCT calculator; label E.)"},
   R2: {f: "Randomising whole groups prevents contamination at the cost of a design effect.",
     what: "Whole groups (offices, schools, regions) are randomised and everyone in a group receives the same condition. Example: offices are randomised to a new case-management process, and the share of cases resolved within 30 days is compared (50% expected under usual practice, 50 cases per office).",
     sel: "Offered for an effect question when allocation can be random, delivery is to groups (or to individuals when the control group is likely to be exposed), and the intervention can be withheld or delayed.",
     ass: "Random allocation of clusters, with clustering accounted for in the analysis. Mixed model or GEE; cluster-level analysis with fewer than 30 clusters. R1 is more efficient whenever individuals can be allocated without contamination.",
     n: "Detecting a rise from 50% to 60% with 50 cases per office needs 24 offices at an ICC of 0.01, 54 at 0.05 and 92 at 0.10 (1,200, 2,700 and 4,600 cases). Adding cases within offices gives diminishing returns, so an ICC estimate from earlier data is the key planning input (design effect 1 + ((CV² + 1)m − 1)ICC, with m cases per office and CV the variation in office size). (Label E; results with fewer than 30 clusters carry a warning.)"},
   R3: {f: "Every cluster receives the intervention, in a random order.",
-    what: "Clusters switch from control to intervention at randomly ordered steps until all have it, with outcomes measured in every period. Example: offices adopt a new system in four steps over five periods, with 20 cases per office per period.",
+    what: "Clusters switch from control to intervention at randomly ordered steps until all clusters have the intervention, with outcomes measured in every period. Example: offices adopt a new system in four steps over five periods, with 20 cases per office per period.",
     sel: "Offered for an effect question when the rollout order can be set (randomly or by rule), delivery is to groups, the control condition can only be delayed, and a long time is available.",
     ass: "Random order of rollout and a correctly modelled time trend, since intervention periods fall later on average than control periods. Mixed model with fixed period effects. R2 needs more clusters but no trend model (a non-random order turns the design into staggered adoption, closer to Q1; Inferred).",
     n: "Detecting 0.2 SD at an ICC of 0.05 needs 27 offices (2,700 measurements) at a cluster autocorrelation of 0.8, and 23 offices when the cluster effect is stable over time (autocorrelation 1, the Hussey and Hughes model). A parallel cluster RCT with the same 20 cases per office needs 80 offices (1,600 cases), so the stepped wedge saves clusters but spends measurements. (GLS with block-exchangeable correlation, different people in each period only; label V; normal approximation, so results with fewer than 30 clusters carry a warning.)"},
-  R4: {f: "Each person acts as their own control.",
+  R4: {f: "Each person receives both conditions, which removes differences between people from the comparison.",
     what: "Each participant receives both conditions in random order, separated by a washout period. Example: staff complete an online form in an old and a new version, in random order, and completion time is compared.",
     sel: "Offered for an effect question when allocation can be random, delivery is to individuals, the intervention can be withheld or delayed, and the outcome is observable quickly.",
     ass: "No carryover from the first period and a stable condition across periods. Paired analysis or a mixed model with a period effect. R1 is needed when the first condition changes the person for good (learning, lasting effects).",
     n: "Detecting 0.3 SD needs 90 participants when a person's two outcomes correlate at 0.5 and 56 at 0.7, against 352 for a parallel RCT. The saving comes from each person contributing to both arms and from removing stable differences between people (variance 2SD²(1 − ρ)/N, against 4SD²/N for a parallel trial). (Noncentral t with N − 2 df; label E.)"},
-  R5: {f: "Two interventions are tested for the price of one, but their interaction costs four times as much.",
+  R5: {f: "Two interventions are tested for the price of one, but testing whether the two interact costs four times as much.",
     what: "Two interventions are crossed so that people receive neither, A only, B only, or both. Example: a plain-language letter (A) and a text reminder (B) are tested in the same trial, with response compared across the four groups.",
     sel: "Offered for an effect question when allocation can be random, delivery is to individuals or groups, and the interventions can be withheld or delayed.",
-    ass: "The main-effect saving relies on little or no interaction between A and B. Regression with both factors, plus the interaction term when it is tested. Two separate R1 trials are the alternative when the interventions are expected to interact strongly.",
+    ass: "The main-effect saving relies on little or no interaction between A and B. Regression with both factors, plus the interaction term when the interaction is tested. Two separate R1 trials are the alternative when the interventions are expected to interact strongly.",
     n: "Detecting a main effect of 0.2 SD needs 788 people, the same as a two-arm trial of one intervention, so B is tested at no extra cost. Detecting an interaction of the same size needs 3,144 (786 per group), four times as many (variance 16SD²(1 − R²)/N). Binary interactions are sized on the percentage point, odds ratio or risk ratio scale (an interaction on one scale can vanish on another). (Label E; binary interaction checked by simulation, power 0.798 to 0.801 against a target of 0.80.)"},
   R6: {f: "When access cannot be withheld, randomise the invitation instead.",
-    what: "Everyone can use the service, but a random half receive an encouragement to take it up. Example: a support service is open to all, and a random half receive a personal invitation; take-up is 60% among those invited and 20% among the rest.",
+    what: "Everyone can use the service, but a random half receive an encouragement to use the service. Example: a support service is open to all, and a random half receive a personal invitation; take-up is 60% among those invited and 20% among the rest.",
     sel: "Offered for an effect question when allocation can be random, delivery is to individuals, and the intervention cannot be withheld.",
-    ass: "The invitation affects the outcome only through take-up, and nobody is put off by it. Intention-to-treat analysis plus instrumental variable estimation of the effect among those who take it up due to the invitation (complier average causal effect). R1 is preferable whenever withholding is acceptable.",
+    ass: "The invitation affects the outcome only through take-up, and nobody is put off by the invitation. Intention-to-treat analysis plus instrumental variable estimation of the effect among those who take up the service due to the invitation (complier average causal effect). R1 is preferable whenever withholding is acceptable.",
     n: "An effect of 0.25 SD among compliers shrinks to 0.10 SD in the intention-to-treat comparison when take-up rises by 40 percentage points, which needs 3,142 people. With a 20 point rise in take-up the sample grows to 12,562, as the required size scales with one over the squared take-up difference. (Two-arm RCT on the encouragement effect; label E.)"},
   R7: {f: "Interim looks allow early stopping but raise the maximum sample.",
-    what: "A randomised trial with planned interim analyses, at which it can stop early for benefit or futility, or adapt (for example drop an arm). Example: a trial of a new reminder whose outcome is known within weeks is analysed after one third and two thirds of recruitment.",
+    what: "A randomised trial with planned interim analyses, at which the trial can stop early for benefit or futility, or adapt (for example drop an arm). Example: a trial of a new reminder whose outcome is known within weeks is analysed after one third and two thirds of recruitment.",
     sel: "Offered for an effect question when allocation can be random and the intervention can be withheld or delayed (outcomes need to arrive quickly relative to recruitment).",
     ass: "Random allocation, with stopping rules and alpha spending fixed in advance and overseen by a data monitoring committee. Analysis as R1 with alpha spending. R1 is simpler when outcomes arrive too late for interim looks to change anything.",
     n: "The calculator gives the fixed-design R1 size (788 people for 0.2 SD) with a warning that interim analyses raise the maximum by an amount set by the stopping boundary and the number of looks. That maximum is not computed and needs dedicated group-sequential software (the expected size can still fall below the fixed design when the trial stops early). (Label E for the fixed design.)"},
   Q1: {f: "The comparison group's change stands in for what would have happened.",
-    what: "Units that received a change and units that did not are compared on how much their outcomes moved from before to after. Example: a new processing rule starts in some offices in 2025, and the change in a quarterly outcome over four quarters before and four after is compared with offices without the rule.",
+    what: "Units that received a change and units that did not are compared on how much the outcomes moved from before to after. Example: a new processing rule starts in some offices in 2025, and the change in a quarterly outcome over four quarters before and four after is compared with offices without the rule.",
     sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to individuals or groups, and at least one measurement period exists before the change.",
     ass: "Parallel trends (without the change, both groups would have moved in parallel) and no anticipation. Two-way fixed effects; with staggered adoption, Callaway and Sant'Anna or a similar estimator, since two-way fixed effects can be biased there. Q5 suits few units with long series, and Q3 suits a sharp eligibility cut-off.",
     n: "Detecting 0.2 SD with four periods before and four after needs 197 units when a unit's outcomes correlate at 0.5 across periods, and 79 at 0.8. Long panels of stable units therefore need fewer units, as the variance per unit falls with (1 − ρ)(m + r)/(mr) for m periods before and r after. (Equal correlation between all periods assumed; label I; correlation that decays over time or staggered timing calls for simulation.)"},
   Q2: {f: "One treated unit is compared with a weighted blend of untreated units.",
-    what: "A weighted combination of untreated units (donors) is built to match the treated unit's outcome series before the change, and the gap after the change is the estimated effect. Example: one region introduces a new policy, and its monthly outcome is compared with a blend of 19 other regions that tracked it closely beforehand.",
+    what: "A weighted combination of untreated units (donors) is built to match the treated unit's outcome series before the change, and the gap after the change is the estimated effect. Example: one region introduces a new policy, and the region's monthly outcome is compared with a blend of 19 other regions that tracked that outcome closely beforehand.",
     sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to a population or group, and at least 10 periods exist before the change (the threshold of 10 is an assumption in the catalogue).",
     ass: "The weighted donors reproduce what would have happened to the treated unit, and no donor is affected by the change. Synthetic control with placebo (permutation) inference, assigning the change to each donor in turn. Q5 is the alternative when a single comparison series is credible, and Q1 when many units are treated.",
-    n: "No minimum detectable effect exists; the number of donors sets the smallest p-value the placebo test can reach, 1/(donors + 1). With 9 donors this is 0.1, so p ≤ 0.05 is unreachable whatever the effect, while 19 donors give 0.05 and 39 give 0.025. Beyond that bound, detection depends on the effect relative to the donors' placebo gaps, which only a placebo simulation shows. (Label E for the p-value bound.)"},
+    n: "No minimum detectable effect exists; the number of donors sets the smallest p-value the placebo test can reach, 1/(donors + 1). With 9 donors the smallest p-value is 0.1, so p ≤ 0.05 is unreachable whatever the effect, while 19 donors give 0.05 and 39 give 0.025. Beyond that bound, detection depends on the effect relative to the donors' placebo gaps, which only a placebo simulation shows. (Label E for the p-value bound.)"},
   Q3: {f: "Units just either side of a cut-off are compared.",
-    what: "When treatment depends on a score crossing a cut-off, units just above and just below it are compared. In a sharp design everyone above the cut-off is treated; in a fuzzy design only the chance of treatment jumps there. Example: applicants scoring 60 or more on an assessment receive extra support, and outcomes of those scoring just above and just below 60 are compared.",
+    what: "When treatment depends on a score crossing a cut-off, units just above and just below the cut-off are compared. In a sharp design everyone above the cut-off is treated; in a fuzzy design only the chance of treatment jumps at the cut-off. Example: applicants scoring 60 or more on an assessment receive extra support, and outcomes of those scoring just above and just below 60 are compared.",
     sel: "Offered for an effect question when allocation follows a threshold rule and delivery is to individuals.",
-    ass: "No manipulation of the score around the cut-off, and outcomes that would have changed smoothly across it without the treatment. Local linear regression within a bandwidth (fuzzy designs divide by the jump in treatment). The estimate applies only to units near the cut-off; Q1 or Q6 are the alternatives when the cut-off is applied inconsistently.",
+    ass: "No manipulation of the score around the cut-off, and outcomes that would have changed smoothly across the cut-off without the treatment. Local linear regression within a bandwidth (fuzzy designs divide by the jump in treatment). The estimate applies only to units near the cut-off; Q1 or Q6 are the alternatives when the cut-off is applied inconsistently.",
     n: "Detecting 0.2 SD in a sharp design needs 3,768 observations within the bandwidth (1,884 each side), 4.8 times a simple two-group comparison with a triangular kernel. A 50 percentage point jump in treatment instead of 100 raises the requirement fourfold to 15,070, as the variance scales with one over the squared jump. (Flat score density assumed; label I; data-driven bandwidths and robust bias-corrected intervals usually need more, so confirm with rdpower.)"},
   Q4: {f: "The series' own earlier trend stands in for what would have happened.",
-    what: "One outcome series measured at many regular points is compared with the projection of its trend from before the change. Example: a form changes nationally in July 2025, and the monthly completion rate for 36 months before and 18 after is analysed.",
+    what: "One outcome series measured at many regular points is compared with the projection of the series' trend from before the change. Example: a form changes nationally in July 2025, and the monthly completion rate for 36 months before and 18 after is analysed.",
     sel: "Offered for an effect question when nobody controls who receives the change, delivery is to a whole population, and at least 8 periods exist before the change (the threshold of 8 is an assumption in the catalogue).",
     ass: "The pre-change trend would have continued, and nothing else changed at the same time. Segmented regression with autocorrelation (ARIMA or Newey-West). Q5 adds a comparison series that absorbs shared shocks.",
     n: "With 36 points before and 18 after, the smallest detectable step change is 1.96 SD at a lag-1 autocorrelation of 0.3, 1.59 SD with no autocorrelation, and 2.5 SD when only 12 points precede the change. Uncertainty in the pre-change trend sets a floor that more points after the change cannot remove, so a short pre-change series cannot be rescued by longer follow-up. (AR(1) GLS with known autocorrelation; label V; seasonality not modelled, and short series call for simulation.)"},
   Q5: {f: "A comparison series removes shocks shared with the treated series.",
-    what: "The treated series and a similar untreated series are measured at many regular points before and after the change, and the effect is how far the gap between them departs from its earlier trend. Example: one region starts a new reminder letter in July 2025, with monthly response rates for 36 months before and 18 after for that region and a neighbouring region that kept the old letter (a system outage that lowers responses in both regions in March 2026 cancels out in the gap).",
+    what: "The treated series and a similar untreated series are measured at many regular points before and after the change, and the effect is how far the gap between the two series departs from the gap's earlier trend. Example: one region starts a new reminder letter in July 2025, with monthly response rates for 36 months before and 18 after for that region and a neighbouring region that kept the old letter (a system outage that lowers responses in both regions in March 2026 cancels out in the gap).",
     sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, delivery is to a population or group, and at least 8 periods exist before the change.",
-    ass: "Without the change, the gap between the series would have kept to its earlier trend; this fails if the change spills over into the comparison series, or if something else (including how the outcome is recorded) changes in only one series. Segmented regression with level, trend, step change and trend change, each interacted with group, allowing for autocorrelation. Unlike Q1, which usually has many units and few periods, it suits one or a few series with many periods and models each trend explicitly.",
-    n: "With 36 points before, 18 after and an autocorrelation of 0.3, the smallest detectable step change is 2.77 SD when the two series are uncorrelated, 1.96 SD at a correlation of 0.5 (the same as Q4) and 1.24 SD at 0.8. A comparison series improves precision only above a correlation of 0.5, since the gap has SD σ√(2(1 − ρ)), although it still guards against shared shocks below that. (Equal SDs and autocorrelation in both series assumed; label I; check by simulation.)"},
+    ass: "Without the change, the gap between the series would have kept to the gap's earlier trend; the assumption fails if the change spills over into the comparison series, or if something else (including how the outcome is recorded) changes in only one series. Segmented regression with level, trend, step change and trend change, each interacted with group, allowing for autocorrelation. Unlike Q1, which usually has many units and few periods, Q5 suits one or a few series with many periods and models each trend explicitly.",
+    n: "With 36 points before, 18 after and an autocorrelation of 0.3, the smallest detectable step change is 2.77 SD when the two series are uncorrelated, 1.96 SD at a correlation of 0.5 (the same as Q4) and 1.24 SD at 0.8. A comparison series improves precision only above a correlation of 0.5, since the gap has SD σ√(2(1 − ρ)), although the comparison series still guards against shared shocks below that correlation. (Equal SDs and autocorrelation in both series assumed; label I; check by simulation.)"},
   Q6: {f: "Recorded characteristics must explain who took up the treatment.",
-    what: "Treated and untreated units are compared after adjusting for recorded characteristics that drive both uptake and the outcome, by regression adjustment, matching, inverse probability weighting (IPW) or augmented IPW (AIPW). Example: people chose whether to attend an optional workshop, and their later outcomes are compared with those of non-attenders after adjusting for prior behaviour and history in administrative records.",
+    what: "Treated and untreated units are compared after adjusting for recorded characteristics that drive both uptake and the outcome, by regression adjustment, matching, inverse probability weighting (IPW) or augmented IPW (AIPW). Example: people chose whether to attend an optional workshop, and attenders' later outcomes are compared with those of non-attenders after adjusting for prior behaviour and history in administrative records.",
     sel: "Offered for an effect question when nobody controls who receives the treatment, delivery is to individuals, and rich pre-treatment data overlap between treated and untreated units (with a warning when the data are only partial).",
-    ass: "No unmeasured confounding, and overlap (every kind of unit could have been treated or not). Balance and overlap diagnostics, then one of the four methods, with a sensitivity analysis for unmeasured confounding. Differences are associated with treatment and estimate its effect only if no unmeasured confounding remains. O1 adds a trial-like protocol with an explicit time zero.",
+    ass: "No unmeasured confounding, and overlap (every kind of unit could have been treated or not). Balance and overlap diagnostics, then one of the four methods, with a sensitivity analysis for unmeasured confounding. Differences are associated with treatment and estimate the treatment effect only if no unmeasured confounding remains. O1 adds a trial-like protocol with an explicit time zero.",
     n: "Detecting 0.2 SD needs 785 units with perfect balance, 1,122 when weighting cuts the effective sample to 70% (effective size ratio 0.7), and 785 again when covariates also explain 30% of outcome variance (R² 0.3). The default ratio of 0.7 is an assumption in the catalogue, best replaced by the ratio from a pilot propensity model. (Two-group normal approximation, variance × (1 − R²)/ratio after trimming; label I.)"},
   Q7: {f: "A factor that shifts uptake but not the outcome isolates the effect.",
-    what: "An external factor (the instrument) changes the chance of receiving the treatment but affects the outcome only through it, and the variation it creates is used to estimate the effect. Example: distance to the nearest service centre changes how likely people are to attend in person, and is assumed to affect the outcome only through attendance.",
+    what: "An external factor (the instrument) changes the chance of receiving the treatment but affects the outcome only through the treatment, and the variation the instrument creates is used to estimate the effect. Example: distance to the nearest service centre changes how likely people are to attend in person, and is assumed to affect the outcome only through attendance.",
     sel: "Offered for an effect question when nobody controls who receives the treatment and delivery is to individuals.",
     ass: "Relevance (the instrument shifts uptake), exclusion (no other path to the outcome) and independence from unmeasured factors. Two-stage least squares, with the estimate applying to units whose uptake responds to the instrument. R6 creates such an instrument by randomising encouragement.",
     n: "Detecting 0.2 SD needs 15,698 units when the instrument explains 5% of the variation in treatment (first-stage partial R² 0.05), and 3,925 at 20%. Weak instruments multiply the sample, as the variance is divided by the first-stage R² (20 times a simple comparison at 0.05); the calculator also reports the expected first-stage F (826 and 981 here) and warns below 10. (Asymptotic IV variance, normal approximation; label I.)"},
   Q8: {f: "Eligible units held back for reasons outside the case act as controls.",
-    what: "Some eligible units are not treated for reasons unrelated to the case (capacity limits, throttling, workload, processing order), and they are compared with treated units from the same periods. Example: a new process was rolled out, but in some months capacity limits held back 20% of eligible cases, and treated and held-back cases from those months are compared (40% expected outcome rate among held-back cases).",
+    what: "Some eligible units are not treated for reasons unrelated to the case (capacity limits, throttling, workload, processing order), and these held-back units are compared with treated units from the same periods. Example: a new process was rolled out, but in some months capacity limits held back 20% of eligible cases, and treated and held-back cases from those months are compared (40% expected outcome rate among held-back cases).",
     sel: "Offered for an effect question when allocation follows a rule or is outside the evaluator’s control, and recommended when some eligible units were not treated for reasons outside the case.",
-    ass: "Holdback unrelated to likely outcomes (as-if random), possibly after adjusting for recorded case features and period. Comparison within the same periods, with period fixed effects, balance checks, regression or AIPW adjustment and a sensitivity analysis. Differences are associated with treatment and estimate its effect only to the extent that holdback was as-if random; Q3 applies instead when holdback follows a score cut-off.",
+    ass: "Holdback unrelated to likely outcomes (as-if random), possibly after adjusting for recorded case features and period. Comparison within the same periods, with period fixed effects, balance checks, regression or AIPW adjustment and a sensitivity analysis. Differences are associated with treatment and estimate the treatment effect only to the extent that holdback was as-if random; Q3 applies instead when holdback follows a score cut-off.",
     n: "Detecting a rise from 40% to 45% needs 4,806 eligible units in holdback periods when 20% are held back (3,845 treated, 962 held back), and 3,067 when half are held back. With 5,000 units and 20% held back, the smallest detectable change is +4.9 or −4.78 percentage points. (Two-arm RCT formula with allocation treated : held back, variance × (1 − R²)/effective size ratio; label I.)"},
-  O1: {f: "Existing data are analysed as if they came from a specified trial.",
+  O1: {f: "Existing data are analysed as if the data came from a specified trial.",
     what: "The protocol of a hypothetical randomised trial (eligibility, treatment strategies, time zero, follow-up, outcome) is written first and then emulated with existing data. Example: administrative records are used to emulate a trial of joining a support program within 30 days of becoming eligible against not joining, with follow-up starting at eligibility for both groups.",
     sel: "Offered for an effect question when nobody controls who receives the treatment, delivery is to individuals, and rich pre-treatment data overlap between treated and untreated units.",
     ass: "No unmeasured confounding, and a time zero aligned with eligibility and treatment assignment (misalignment creates immortal time bias). Inverse probability weighting, AIPW, cloning with censoring and weighting, or other g-methods. Differences are associated with the treatment strategy unless confounding is fully controlled; Q6 shares this assumption without the explicit protocol.",
@@ -1497,20 +1497,20 @@ const DESIGN_TEXT = {
     ass: "Confounding (exposed and unexposed people differ in other ways) and attrition are the main threats, so results describe associations. Poisson, Cox or logistic regression. O3 is more efficient for rare outcomes.",
     n: "Detecting a hazard ratio of 1.3 needs 5,009 people (543 events), against 1,997 people (228 events) for a hazard ratio of 1.5. Power depends on the number of events, so rare or delayed outcomes call for longer follow-up as well as a larger cohort (no adjustment for confounding included; adjusted analyses usually need more people). (Schoenfeld events formula with proportional hazards; label E.)"},
   O3: {f: "People with and without the outcome are compared on past exposure.",
-    what: "Cases (with the outcome) and controls (without it) are sampled and compared on earlier exposure, which makes rare outcomes efficient to study. Example: people who missed a deadline and people who met it are compared on whether they changed address in the previous year (20% among controls).",
+    what: "Cases (with the outcome) and controls (without the outcome) are sampled and compared on earlier exposure, which makes rare outcomes efficient to study. Example: people who missed a deadline and people who met the deadline are compared on a change of address in the previous year (20% among controls).",
     sel: "Offered for association questions when nobody controls the exposure.",
     ass: "Controls must represent the population that produced the cases, and exposure must be recorded equally well in both groups (selection and recall bias). Conditional or unconditional logistic regression, giving odds ratios. O2 gives incidence and hazard ratios when the outcome is common enough to follow forward.",
     n: "Detecting an odds ratio of 1.5 needs 535 cases and 535 controls, or 325 cases with four controls each (1,300 controls). Extra controls therefore substitute for scarce cases, with little gained beyond four per case. (Fleiss z test with k controls per case, as in the RCT calculator; label E.)"},
   O4: {f: "A sample measured once describes how common something is.",
-    what: "A sample is drawn from a defined population and measured at a single point in time to estimate a proportion or mean. Example: a sample of businesses is asked whether they know about a new rule, aiming for a margin of error of ±3 percentage points.",
+    what: "A sample is drawn from a defined population and measured at a single point in time to estimate a proportion or mean. Example: a sample of businesses is asked about awareness of a new rule, aiming for a margin of error of ±3 percentage points.",
     sel: "Offered for descriptive or association questions when nobody controls the exposure.",
     ass: "Exposure and outcome are measured at the same time, so temporal order and cause cannot be established. Weighted proportions or means that reflect the survey design. O2 is needed when the order of events matters.",
     n: "A ±3 point margin around 50% needs 1,068 responses under simple random sampling, 1,601 at a design effect of 1.5, and 880 when the population is only 5,000 (finite population correction, applied when the sample exceeds 5% of the population). These are completed responses, so invitations must be scaled up by the expected response rate (Inferred). (Label E.)"},
   O5: {f: "Change is measured but cannot be attributed to the intervention.",
     what: "The same units are measured before and after an intervention, with no comparison group. Example: satisfaction scores of the same staff are compared before and after a new process.",
-    sel: "Offered for an effect question when nobody controls who receives the intervention; the catalogue rates it the weakest design, and the selector flags it rather than recommending it.",
-    ass: "Any other change over the period (other events, maturation, regression to the mean) is mixed with the intervention, so the change is associated with the intervention but cannot be attributed to it. Paired t-test or McNemar test. Q4 is the step up when many measurements exist before the change.",
-    n: "Detecting a change of 0.2 SD needs 159 people measured twice when a person's two scores correlate at 0.6. The calculation covers detecting a change, not attributing it, and the calculator warns of this. (Paired t test, SD of change SD√(2(1 − ρ)); label E.)"},
+    sel: "Offered for an effect question when nobody controls who receives the intervention; the catalogue rates O5 as the weakest design, and the selector shows O5 with a warning, not as a recommendation.",
+    ass: "Any other change over the period (other events, maturation, regression to the mean) is mixed with the intervention, so the change is associated with the intervention but cannot be attributed to the intervention. Paired t-test or McNemar test. Q4 is the step up when many measurements exist before the change.",
+    n: "Detecting a change of 0.2 SD needs 159 people measured twice when a person's two scores correlate at 0.6. The calculation covers detecting a change, not attributing the change to the intervention, and the calculator shows a warning to that effect. (Paired t test, SD of change SD√(2(1 − ρ)); label E.)"},
   P1: {f: "A test is checked against a reference standard in the same cases.",
     what: "The test or flag and a reference standard are applied to the same cases, and agreement is summarised as sensitivity, specificity, predictive values, likelihood ratios and, for continuous scores, ROC AUC. Example: a screening checklist that flags cases for review is compared with a full review of the same cases (10% expected to need review).",
     sel: "Offered for prediction or classification questions.",
@@ -1521,22 +1521,22 @@ const DESIGN_TEXT = {
     sel: "Offered for prediction or classification questions.",
     ass: "The development data represent the population where the score will be used, and overfitting is controlled by penalised regression and internal validation. Performance is reported as ROC AUC (C-statistic), calibration slope, calibration-in-the-large, O/E ratio, Brier score and net benefit. P3 tests an existing model on new data.",
     n: "Not built into the calculator, which links to pmsampsize instead. More candidate predictors and rarer outcomes both raise the required size, so the predictor list should be fixed before sizing the study."},
-  P3: {f: "An existing model is tested on data it was not built on.",
-    what: "A fixed model is applied to new data, and its calibration, discrimination and net benefit are estimated with confidence intervals, with recalibration if needed. Example: a risk score developed in one region is tested on cases from another region.",
+  P3: {f: "An existing model is tested on data not used to build the model.",
+    what: "A fixed model is applied to new data, and the model's calibration, discrimination and net benefit are estimated with confidence intervals, with recalibration if needed. Example: a risk score developed in one region is tested on cases from another region.",
     sel: "Offered for prediction or classification questions.",
     ass: "The validation data represent the setting where the model will be used, and the model is applied exactly as developed. Calibration slope, O/E ratio, ROC AUC (C-statistic) and net benefit with confidence intervals. P2 applies when the model has to be rebuilt.",
     n: "Not built into the calculator, which links to pmvalsampsize, sizing the study for precise estimates of these performance measures."},
   P4: {f: "Randomisation shows whether using the model changes outcomes.",
     what: "Units are randomised to use the model or not, and the outcome is the real outcome rather than model accuracy such as AUC. Example: offices or case officers are randomised to receive the model's risk flags, and the share of cases resolved is compared (30% expected without the flags).",
     sel: "Offered for effect or prediction questions when allocation can be random.",
-    ass: "Random allocation, with analysis as R1 (individuals) or R2 (clusters such as offices). An accurate model can still leave outcomes unchanged, which only this design can show.",
+    ass: "Random allocation, with analysis as R1 (individuals) or R2 (clusters such as offices). An accurate model can still leave outcomes unchanged, which only P4 can show.",
     n: "With individual randomisation, detecting a rise from 30% to 35% needs 2,754 units (1,377 per arm); randomising offices adds the R2 design effect. (R1 or R2 engine; label E.)"},
 };
 // Finding line plus expandable explanation, used on design cards and calculator pages.
 function designAbout(id){
   const t = DESIGN_TEXT[id]; if (!t) return "";
   const e = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
-  return `<div class="about"><p class="afind">${e(t.f)}</p><details class="amore"><summary>How it works, with a worked example</summary>` +
+  return `<div class="about"><p class="afind">${e(t.f)}</p><details class="amore"><summary>How the design works, with a worked example</summary>` +
     `<p>${e(t.what)}</p><p><strong>Selector.</strong> ${e(t.sel)}</p><p><strong>Assumption and analysis.</strong> ${e(t.ass)}</p><p><strong>Sample size.</strong> ${e(t.n)}</p>` +
     `<p class="anote">Worked numbers from the Beyond Magenta engine (two-sided alpha 0.05, power 80%).</p></details></div>`;
 }
@@ -1552,30 +1552,30 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 
 const nonrandom = A => A.start==="yes" && (A.c_rand==="no" || A.c_encourage==="no");
 const STEPS = [
- {id:"start", q:"What is the research question about?", h:"Pick the closest; it can be changed later from the answer list.", when:A=>true, options:[
+ {id:"start", q:"What is the research question about?", h:"Pick the closest topic; the topic can be changed later from the answer list.", when:A=>true, options:[
    {label:"The effect of an intervention, policy or program", desc:"Did a reminder letter change response rates? Does a treatment change the behaviour of interest?", set:{start:"yes"}},
    {label:"Predicting or classifying an outcome", desc:"A risk score, a screening test, or a flag that identifies who is likely to have the outcome.", set:{start:"no", nc_pred:"yes"}},
-   {label:"How common something is, or its level", desc:"Prevalence, averages or distributions in a population at a point in time.", set:{start:"no", nc_pred:"no", nc_prev:"yes"}},
+   {label:"How common something is, or the level of a measure", desc:"Prevalence, averages or distributions in a population at a point in time.", set:{start:"no", nc_pred:"no", nc_prev:"yes"}},
    {label:"What is associated with an outcome", desc:"Risk factors or characteristics linked to an outcome, without testing an intervention.", set:{start:"no", nc_pred:"no", nc_prev:"no"}}
  ]},
  {id:"nc_pred", q:"Is the aim to predict or classify an outcome?", h:"A risk score, a screening test, or a flag that identifies who is likely to have the outcome.", when:A=>A.start==="no"},
  {id:"p_ref", q:"Is a test or flag compared against a reference standard?", h:"A reference standard is the best available way to confirm who truly has the outcome.", when:A=>A.nc_pred==="yes"},
- {id:"p_exist", q:"Does the prediction model already exist?", h:"Answer No if it is still being built.", when:A=>A.p_ref==="no"},
- {id:"p_impact", q:"Is the question whether using the model changes outcomes, rather than how accurate it is?", h:"Accuracy (AUC, calibration) and impact on outcomes are different questions.", when:A=>A.p_exist==="yes"},
- {id:"nc_prev", q:"Is the question how common something is, or its level, in a population?", h:"Prevalence, averages or distributions at a point in time.", when:A=>A.nc_pred==="no"},
+ {id:"p_exist", q:"Does the prediction model already exist?", h:"Answer No if the model is still being built.", when:A=>A.p_ref==="no"},
+ {id:"p_impact", q:"Is the question whether using the model changes outcomes, rather than how accurate the model is?", h:"Accuracy (AUC, calibration) and impact on outcomes are different questions.", when:A=>A.p_exist==="yes"},
+ {id:"nc_prev", q:"Is the question how common something is, or the level of a measure, in a population?", h:"Prevalence, averages or distributions at a point in time.", when:A=>A.nc_pred==="no"},
  {id:"ae_rare", q:"The question is what is associated with an outcome. Is the outcome rare?", h:"Rare: too few events would occur if everyone were followed up.", when:A=>A.nc_prev==="no"},
  {id:"c_rand", q:"Can the intervention be allocated at random?", h:"Random allocation by lottery or computer, at the level of people or groups. Answer No if allocation was by rule, by staff or by capacity.", when:A=>A.start==="yes"},
- {id:"c_withhold", q:"Can a control group go without it for the study period?", h:"Usual practice or a delayed start both count.", when:A=>A.c_rand==="yes"},
- {id:"c_encourage", q:"Can some people be encouraged at random to take it up instead?", h:"An invitation, reminder or nudge sent at random while everyone keeps access.", when:A=>A.c_withhold==="no"},
- {id:"c_group", q:"Is it delivered through groups, or could the control group be exposed to it?", h:"Groups such as offices, schools, clinics or regions.", when:A=>A.c_withhold==="yes"},
- {id:"c_allget", q:"Must every group receive it eventually, with only the timing randomised?", h:"A phased rollout in random order.", when:A=>A.c_group==="yes"},
+ {id:"c_withhold", q:"Can a control group go without the intervention for the study period?", h:"Usual practice or a delayed start both count.", when:A=>A.c_rand==="yes"},
+ {id:"c_encourage", q:"Can some people be encouraged at random to take up the intervention instead?", h:"An invitation, reminder or nudge sent at random while everyone keeps access.", when:A=>A.c_withhold==="no"},
+ {id:"c_group", q:"Is the intervention delivered through groups, or could the control group also be exposed to the intervention?", h:"Groups such as offices, schools, clinics or regions.", when:A=>A.c_withhold==="yes"},
+ {id:"c_allget", q:"Must every group receive the intervention eventually, with only the timing randomised?", h:"A phased rollout in random order.", when:A=>A.c_group==="yes"},
  {id:"c_two", q:"Are two interventions tested at the same time?", h:"Each unit can get neither, either or both.", when:A=>A.c_group==="no"},
  {id:"c_cross", q:"Could each person receive both conditions in turn?", h:"Only if the outcome is stable and the effect wears off between periods.", when:A=>A.c_two==="no"},
  {id:"c_interim", q:"Are interim analyses needed to stop early for benefit or harm?", h:"Requires outcomes that arrive quickly during recruitment.", when:A=>A.c_cross==="no"},
  {id:"n_cut", q:"Is eligibility linked to a cut-off on a continuous score?", h:"For example: cases scoring above 70 become eligible. Answer Yes even if the cut-off is not applied consistently.", when:nonrandom},
- {id:"n_cut_sharp", q:"Is the cut-off applied consistently: almost everyone above it treated, almost no one below?", h:"Answer No if staff discretion, capacity or timing means many above the cut-off were not treated.", when:A=>nonrandom(A)&&A.n_cut==="yes"},
+ {id:"n_cut_sharp", q:"Is the cut-off applied consistently: almost everyone above the cut-off treated and almost no one below?", h:"Answer No if staff discretion, capacity or timing means many above the cut-off were not treated.", when:A=>nonrandom(A)&&A.n_cut==="yes"},
  {id:"n_cut_jump", q:"Does the chance of being treated still jump noticeably at the cut-off?", h:"For example: 10% treated just below and 60% just above.", when:A=>nonrandom(A)&&A.n_cut_sharp==="no"},
- {id:"n_hold", q:"Among eligible units, were some not treated for reasons outside the case itself?", h:"Capacity limits, throttling, workload, processing order or system outages, including when this happened only in some periods.", when:nonrandom},
+ {id:"n_hold", q:"Among eligible units, were some not treated for reasons outside the case itself?", h:"Capacity limits, throttling, workload, processing order or system outages, including holdback in some periods only.", when:nonrandom},
  {id:"n_hold_random", q:"Was the holdback unrelated to the features of each case?", h:"Answer No if staff chose which cases to hold back based on case characteristics or expected outcome.", when:A=>nonrandom(A)&&A.n_hold==="yes"},
  {id:"n_timing", q:"Does treatment start at different times for different units?", h:"Staggered or inconsistent timing of assignment.", when:nonrandom},
  {id:"n_prepost", q:"Are outcome data available for treated and comparison units from before treatment started?", h:"At least one period before; more periods improve power.", when:nonrandom},
@@ -1617,20 +1617,20 @@ function nonRandomResult(A){
   const notes = [];
   if (A.n_cut==="yes" && A.n_cut_sharp==="yes") add("Q3",1,"Cut-off applied consistently","Sharp RDD");
   if (A.n_hold==="yes" && A.n_hold_random==="yes") add("Q8",2,"Eligible units held back for reasons outside the case");
-  if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="yes") add("Q3",3,"Chance of treatment jumps at the cut-off","Fuzzy RDD: the cut-off acts as an instrument; estimates apply to cases near the cut-off whose treatment depends on it");
+  if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="yes") add("Q3",3,"Chance of treatment jumps at the cut-off","Fuzzy RDD: the cut-off acts as an instrument; estimates apply to cases near the cut-off whose treatment depends on the cut-off");
   if (A.n_prepost==="yes") add("Q1",4, A.n_timing==="yes"?"Pre-treatment data with staggered timing":"Pre-treatment data for treated and comparison units", A.n_timing==="yes"?"Staggered adoption: use heterogeneity-robust estimators, not plain two-way fixed effects":undefined);
   if (A.n_comp==="yes") add("Q5",5,"Population change with an unaffected comparison series");
   if (A.n_few==="yes") add("Q2",6,"Few treated aggregate units");
   if (A.n_iv==="yes") add("Q7",7,"A factor shifts treatment but not the outcome directly");
   if (A.n_its==="yes") add("Q4",8,"Population change with 8 or more prior points");
-  if (A.n_hold==="yes" && A.n_hold_random==="no") add("Q6",9,"Held-back cases were selected on case features, so adjust for those features","Within eligible units: compare treated with held-back cases after adjusting for the features used to choose them");
+  if (A.n_hold==="yes" && A.n_hold_random==="no") add("Q6",9,"Held-back cases were selected on case features, so adjust for those features","Within eligible units: compare treated with held-back cases after adjusting for the features used to choose the held-back cases");
   if (A.n_soo==="yes") add("Q6",9,"Rich pre-treatment data with overlap");
   if (A.n_tte==="yes") add("O1",9.5,"Longitudinal data with a clear start time");
-  if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="no") notes.push("The cut-off only defines who is eligible; it does not identify an effect by itself. Restrict the comparison to eligible units.");
+  if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="no") notes.push("The cut-off only defines who is eligible and does not identify an effect by itself. Restrict the comparison to eligible units.");
   if (A.n_timing==="yes" && A.n_prepost!=="yes") notes.push("Inconsistent timing alone does not identify an effect without data from before treatment. With a held-back group, compare within each period (period fixed effects).");
   if (A.n_hold==="yes" && A.n_timing==="yes") notes.push("Holdback that occurs only in some periods: use only those periods for the treated versus held-back comparison and include period fixed effects; check that cases in those periods resemble the rest.");
   const sorted = c.sort((a,b)=>a.rank-b.rank);
-  if (sorted.filter(x=>x.id!=="O1").length>1) notes.push("Several designs fit. They can be combined (for example a held-back comparison with period fixed effects, checked against a fuzzy RDD near the cut-off). Agreement across designs strengthens the finding.");
+  if (sorted.filter(x=>x.id!=="O1").length>1) notes.push("Several designs fit and can be combined (for example a held-back comparison with period fixed effects, checked against a fuzzy RDD near the cut-off). Agreement across designs strengthens the finding.");
   if (!sorted.length) return {ids:["O5"], theory:true, notes};
   return {ids:sorted.map(x=>x.id), meta:Object.fromEntries(sorted.map(x=>[x.id,x])), notes};
 }
@@ -1674,9 +1674,9 @@ function designCard(id, rank, meta){
   const inputs = (pw.extra_inputs||[]).map(x => `<span class="chip">${esc(x.label)}${x.default!==undefined?` <span class="mono">(default ${esc(x.default)})</span>`:""}</span>`).join("");
   const row=(k,v)=> v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:"";
   const output = pw.default_output ? `<dt>App output</dt><dd>Default: ${esc(pw.default_output)}. Option: ${esc(pw.user_option)}. Tool: ${esc(pw.link_out)}</dd>` : "";
-  const sof = (id==="Q6"||id==="O1"||id==="Q8") ? `<div class="note info">No random allocation: sensitivity analysis is required (E-value, robustness value or Rosenbaum bounds), plus balance checks. Report results as "associated with" unless they hold up to plausible unmeasured confounding.</div>` : "";
-  const weak = id==="O5" ? `<div class="note warn">This is the weakest option: change over time cannot be attributed to the intervention. Use it only if nothing stronger is feasible.</div>` : "";
-  const why = meta ? `<div class="note info"><strong>Why it fits:</strong> ${esc(meta.why)}${meta.variant?`. ${esc(meta.variant)}`:""}.</div>` : "";
+  const sof = (id==="Q6"||id==="O1"||id==="Q8") ? `<div class="note info">No random allocation: sensitivity analysis is required (E-value, robustness value or Rosenbaum bounds), plus balance checks. Report results as "associated with" unless the results hold up to plausible unmeasured confounding.</div>` : "";
+  const weak = id==="O5" ? `<div class="note warn">Single-group pre-post is the weakest design: change over time cannot be attributed to the intervention. Use this design only if nothing stronger is feasible.</div>` : "";
+  const why = meta ? `<div class="note info"><strong>Why the design fits:</strong> ${esc(meta.why)}${meta.variant?`. ${esc(meta.variant)}`:""}.</div>` : "";
   const rk = rank===undefined ? "" : `<span class="rank">${rank===0?"Strongest fit":"Also fits"}</span>`;
   return `<article class="design ${rank===0?"primary":""}">
     <div class="dtop"><span class="did">${esc(id)}</span><span class="dname">${esc(d.name)}</span><span class="tag">${esc(FAMILY[d.family]||d.family)}</span>${rk}</div>
@@ -1701,7 +1701,7 @@ function renderBrowse(main){
   const groups = {};
   Object.values(DATA.designs).forEach(d => (groups[d.family] ||= []).push(d));
   main.innerHTML = `<div class="results">
-    <div class="rhead"><div class="qnum">All designs</div><h2>Pick a design directly</h2><p>Use this when the design has already been chosen, or to compare options.</p></div>
+    <div class="rhead"><div class="qnum">All designs</div><h2>Pick a design directly</h2><p>Use the list when the design has already been chosen, or to compare designs.</p></div>
     ${Object.entries(groups).map(([f,ds]) => `<div><div class="tag" style="margin-bottom:8px">${esc(FAMILY[f]||f)}</div><div class="inputs">${ds.map(d=>`<button type="button" class="ghost pick" data-id="${d.id}"><span class="mono">${d.id}</span> ${esc(d.name)}</button>`).join("")}</div></div>`).join("")}
     ${browseId?designCard(browseId):""}
     <div class="controls"><button type="button" class="ghost" id="btnFlow">Back to questions</button></div></div>`;
@@ -1813,7 +1813,7 @@ function resultHtml(id, st){
     ${r.main.map(([k, val, s]) => `<div class="rmain"><div class="rk">${esc(k)}</div><div class="rv">${esc(val)}</div>${s ? `<div class="rs">${esc(s)}</div>` : ""}</div>`).join("")}
     ${r.rows.length ? `<dl class="rrows">${r.rows.map(([k, val]) => `<dt>${esc(k)}</dt><dd>${esc(val)}</dd>`).join("")}</dl>` : ""}
     ${(r.warns || []).map(w => `<div class="note warn">${esc(w)}</div>`).join("")}
-    <div class="how"><div class="rk">How it is calculated <span class="lbl">${esc(LABEL_LONG[r.lab] || r.lab)}</span></div><p>${esc(r.how)}</p>
+    <div class="how"><div class="rk">How the result is calculated <span class="lbl">${esc(LABEL_LONG[r.lab] || r.lab)}</span></div><p>${esc(r.how)}</p>
       <p class="muted">Two-sided alpha ${fX(v.alpha)}${v.power ? `, power ${fX(v.power)}%` : ""}. Entered values are inputs, not verified facts.</p></div>
     ${(r.notes || []).map(n => `<div class="note info">${esc(n)}</div>`).join("")}
     <div class="rcopy"><button type="button" class="ghost sm" data-copy="md">Copy as Markdown</button><button type="button" class="ghost sm" data-copy="csv">Copy as CSV</button><span class="copymsg" role="status"></span><textarea class="copyout" hidden readonly rows="8" aria-label="Result text to copy"></textarea></div>`;
@@ -1821,7 +1821,7 @@ function resultHtml(id, st){
 function renderCalc(main, id, opts = {}){
   const d = DATA.designs[id] || {name: "Basic comparison of two groups"}, spec = CD[id], st = calcState(id);
   const head = opts.tab
-    ? `<div class="rhead"><div class="qnum">Sample size calculator</div><h2>Sample size or minimum detectable effect</h2><p>Use it before or after choosing a design. Start with a basic comparison of two groups, or pick a design; answers carry over when switching.</p></div>
+    ? `<div class="rhead"><div class="qnum">Sample size calculator</div><h2>Sample size or minimum detectable effect</h2><p>The calculator works before or after a design is chosen. Start with a basic comparison of two groups, or pick a design; answers carry over when switching.</p></div>
        <div class="dpick"><label for="tabDesign">Design</label><div class="dpsel"><select id="tabDesign">${designOptions(id)}</select>${qbtn("x_design", "Design")}</div></div>${xpanel("x_design", EXPLAIN.design, "qx")}${designAbout(id)}`
     : `<div class="rhead"><div class="qnum">Sample size and minimum detectable effect</div><h2><span class="did">${esc(id)}</span> ${esc(d.name)}</h2></div>${designAbout(id)}`;
   const nav = opts.tab
@@ -1832,10 +1832,10 @@ function renderCalc(main, id, opts = {}){
   if (spec.modes !== null){ const M = spec.modes || MODE_DEFAULT;
     html += choiceBlock("cq_mode", "Is the sample already fixed?", "For example existing administrative data, or a fixed number of sites.", [["mde", M.mde[0], M.mde[1]], ["n", M.n[0], M.n[1]]], st.mode); }
   const needOutcome = spec.outcomes === true;
-  if (st.mode && needOutcome) html += choiceBlock("cq_out", "What type of outcome is it?", "", [["cont", "Continuous", "An amount, score or count measured on each unit, compared as a mean."], ["bin", "Binary", "Yes or no for each unit, compared as a percentage."]], st.outcome);
+  if (st.mode && needOutcome) html += choiceBlock("cq_out", "What type of outcome is measured?", "", [["cont", "Continuous", "An amount, score or count measured on each unit, compared as a mean."], ["bin", "Binary", "Yes or no for each unit, compared as a percentage."]], st.outcome);
   const ready = st.mode && (!needOutcome || st.outcome);
   if (ready){ const {fl} = calcValues(id, st);
-    html += `<div class="calcgrid"><div class="cfields"><div class="q small">Details of the study</div><p class="help">The result updates while typing. Defaults are marked; replace them with values from the study data where possible.</p>${fl.map(f => fieldHtml(f, st, id)).join("")}</div>
+    html += `<div class="calcgrid"><div class="cfields"><div class="q small">Details of the study</div><p class="help">The result updates while typing. Defaults are marked; replace the defaults with values from the study data where possible.</p>${fl.map(f => fieldHtml(f, st, id)).join("")}</div>
       <aside class="calcres" id="calcres" aria-live="polite">${resultHtml(id, st)}</aside></div>`; }
   if (ready && CMP_BASES.has(id)) html += designChangeHtml(id);
   main.innerHTML = `<div class="results">${html}${nav}</div>`;
@@ -1884,7 +1884,7 @@ const ROW_PARAMS = {
   O1: [["ess", "ESS ratio", "0.7"], ["trim", "Trimmed %", "0"]],
   O5: [["rho", "Pre-post ρ", "0.5"]],
 };
-const ROW_TEXT = {Q2: null, Q4: "Counts time points, not units: open it to enter the series.", Q5: "Counts time points, not units: open it to enter the series.", O2: "Uses a hazard ratio and event rates rather than this effect: open it to enter them.", O3: "Compares exposure between cases and controls: open it to enter the exposure and odds ratio."};
+const ROW_TEXT = {Q2: null, Q4: "Counts time points, not units: open the design to enter the series.", Q5: "Counts time points, not units: open the design to enter the series.", O2: "Uses a hazard ratio and event rates rather than this effect: open the design to enter the hazard ratio and rates.", O3: "Compares exposure between cases and controls: open the design to enter the exposure and odds ratio."};
 const ROW_NAME = {R1: "Parallel RCT with more arms", R5: "Factorial RCT: interaction", R7: "Group-sequential RCT"};
 // designs whose answers can seed the comparison (a difference in means or percentages between groups)
 const CMP_BASES = new Set(["G0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "Q1", "Q3", "Q6", "Q7", "Q8", "O1", "O5", "P4"]);
@@ -1939,8 +1939,8 @@ function designChangeHtml(base){
   const rows = all.filter(([id]) => id !== base);
   const nameOf = id => id === "G0" ? "Basic comparison of two groups" : (ROW_NAME[id] || DATA.designs[id].name);
   const cur = `<div class="dcrow cur" data-id="${base}" data-cur="1"><span class="did">${base === "G0" ? "–" : base}</span><div class="dcname"><div class="dcn">${esc(base === "G0" ? "Basic comparison of two groups" : DATA.designs[base].name)}</div><div class="dct">Current design and answers</div></div><div class="dcp"></div><div class="dcr">${rowResultHtml(base, base)}</div><span></span></div>`;
-  return `<section class="dchange"><div class="q small">How a different design would change this</div>
-    <p class="help">Each row reuses the answers above (effect, outcome, alpha, power${CS[base]?.mode === "mde" ? ", and the sample converted to that design’s units" : ""}) plus that design’s own inputs. The values in the small boxes are illustrative starting points, not estimates for this study: replace them with values from its data. “Use” switches to that design with the same values.</p>
+  return `<section class="dchange"><div class="q small">How a different design would change the result</div>
+    <p class="help">Each row reuses the answers above (effect, outcome, alpha, power${CS[base]?.mode === "mde" ? ", and the sample converted to that design’s units" : ""}) plus that design’s own inputs. The values in the small boxes are illustrative starting points, not estimates for this study: replace the illustrative values with values from the study data. “Use” switches to that design with the same values.</p>
     <div class="dcrows">${cur}${rows.map(([id, txt, lab]) => `<div class="dcrow" data-id="${id}"><span class="did">${id === "G0" ? "–" : id}</span>
       <div class="dcname"><div class="dcn">${esc(nameOf(id))}</div><div class="dct">${esc(txt)}<span class="lbl">${esc(LABEL[lab] || lab)}</span></div></div>
       <div class="dcp">${rowParamsHtml(id)}</div><div class="dcr">${rowResultHtml(id, base)}</div>
@@ -2045,7 +2045,7 @@ document.getElementById("main").addEventListener("click", async ev => {
   if (!d) { msg.textContent = "Complete the inputs to copy a result."; return; }
   const text = b.dataset.copy === "csv" ? toCSV(d) : toMarkdown(d);
   if (await copyText(text)) { msg.textContent = (b.dataset.copy === "csv" ? "CSV" : "Markdown") + " copied."; out.hidden = true; }
-  else { out.value = text; out.hidden = false; out.focus(); out.select(); msg.textContent = "The browser blocked copying: the text is selected below (Ctrl+C or Cmd+C copies it)."; }
+  else { out.value = text; out.hidden = false; out.focus(); out.select(); msg.textContent = "The browser blocked copying: the text is selected below (Ctrl+C or Cmd+C copies the text)."; }
 });
 
 // ---- tabs: arrow keys, Home and End (WAI-ARIA tabs pattern, automatic activation) ----
@@ -2083,7 +2083,7 @@ window.addEventListener("afterprint", () => document.querySelectorAll('details[d
 restoreState();
 
 document.getElementById("btnBrowse").onclick = () => { view="browse"; browseId=null; render(); };
-document.getElementById("foot").innerHTML = `Catalogue version ${esc(DATA.version)}, ${fmtDate(DATA.released)}. Defaults: two-sided alpha 0.05, power 80%. Labels: Verified (checked against a source), Established (standard statistical result), Inferred, Assumption. Ranking of non-randomised designs reflects the usual strength of their identifying assumptions and is a first proposal. Sample size and minimum detectable effect results for randomised designs use the same engine as the RCT sample size calculator; other designs use the closed-form approximations shown with each result, checked against independent calculations and Monte Carlo simulation (${fmtDate(DATA.validatedOn)}). Beyond Magenta suggests designs and planning values; it does not replace methodological review. Answers and inputs are kept in this browser only and survive a page refresh; nothing entered is sent anywhere.`;
+document.getElementById("foot").innerHTML = `Catalogue version ${esc(DATA.version)}, ${fmtDate(DATA.released)}. Defaults: two-sided alpha 0.05, power 80%. Labels: Verified (checked against a source), Established (standard statistical result), Inferred, Assumption. Ranking of non-randomised designs reflects the usual strength of each design’s identifying assumptions and is a first proposal. Sample size and minimum detectable effect results for randomised designs use the same engine as the RCT sample size calculator; other designs use the closed-form approximations shown with each result, checked against independent calculations and Monte Carlo simulation (${fmtDate(DATA.validatedOn)}). Beyond Magenta suggests designs and planning values and does not replace methodological review. Answers and inputs are kept in this browser only and survive a page refresh; nothing entered is sent anywhere.`;
 render();
 </script>
 </body>
