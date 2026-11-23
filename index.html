@@ -1551,6 +1551,8 @@ const fmtDate = s => new Date(s + "T00:00:00").toLocaleDateString("en-AU", {day:
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 const nonrandom = A => A.start==="yes" && (A.c_rand==="no" || A.c_encourage==="no");
+// few treated aggregate units without a usable donor pool: the treated units' own time series are checked instead
+const fewNoPool = A => A.n_few==="yes" && (A.n_prepost==="no" || A.n_donor==="no");
 const STEPS = [
  {id:"start", q:"What is the research question about?", h:"Pick the closest topic; the topic can be changed later from the answer list.", when:A=>true, options:[
    {label:"The effect of an intervention, policy or program", desc:"Did a reminder letter change response rates? Does a treatment change the behaviour of interest?", set:{start:"yes"}},
@@ -1581,15 +1583,15 @@ const STEPS = [
  {id:"n_timing", q:"Does treatment start at different times for different units?", h:"Staggered or inconsistent timing of assignment.", when:nonrandom},
  {id:"n_prepost", q:"Are outcome data available for treated and comparison units from before treatment started?", h:"At least one period before, for a difference-in-differences comparison; more periods improve power.", when:nonrandom},
  {id:"n_pop", q:"Does the intervention apply to a whole population from one known date?", h:"For example: a law or national policy that starts on one day for everyone, leaving no untreated units in that population.", when:nonrandom},
- {id:"n_comp", q:"Is there a comparable time series that the intervention did not affect?", h:"Another region, age group or outcome measured the same way over the same period (a comparative interrupted time series).", when:A=>nonrandom(A)&&A.n_pop==="yes"},
- {id:"n_its", q:"Are outcome data available for at least 8 time points before the intervention?", h:"For example: monthly data for 8 months or more before the start (an interrupted time series).", when:A=>nonrandom(A)&&A.n_pop==="yes"},
+ {id:"n_comp", q:"Is there a comparable time series that the intervention did not affect?", h:"Another region, age group or outcome measured the same way over the same period (a comparative interrupted time series).", when:A=>nonrandom(A)&&(A.n_pop==="yes"||fewNoPool(A))},
+ {id:"n_its", q:"Are outcome data available for at least 8 time points before the intervention?", h:"For example: monthly data for 8 months or more before the start (an interrupted time series).", when:A=>nonrandom(A)&&(A.n_pop==="yes"||fewNoPool(A))},
  {id:"n_few", q:"Were only one or a few aggregate units treated, such as one state or region?", h:"Aggregate units are areas or organisations measured as a whole, not individuals.", when:A=>nonrandom(A)&&A.n_pop==="no"},
- {id:"n_donor", q:"Are outcome data available for many untreated aggregate units, covering 10 or more periods before the intervention?", h:"The untreated units form the donor pool, which a synthetic control combines into a weighted comparison.", when:A=>nonrandom(A)&&A.n_few==="yes"},
+ {id:"n_donor", q:"Are outcome data available for many untreated aggregate units, covering 10 or more periods before the intervention?", h:"The untreated units form the donor pool, which a synthetic control combines into a weighted comparison.", when:A=>nonrandom(A)&&A.n_few==="yes"&&A.n_prepost==="yes"},
  {id:"n_iv", q:"Is there a factor that affects who is treated, such as a random processing order or which officer happened to be rostered?", h:"A candidate instrument. The factor must be unrelated to the features of each unit, as with a random order or roster.", when:nonrandom},
  {id:"n_iv_excl", q:"Does the factor affect the outcome only through treatment?", h:"The exclusion restriction. Answer No if the factor also changes the outcome in other ways, for example rostered officers who differ in treatment rates and also in case assessment.", when:A=>nonrandom(A)&&A.n_iv==="yes"},
  {id:"n_soo", q:"Do pre-treatment data cover the factors that drive both treatment and the outcome (the confounders)?", h:"Selection on observables assumes no important confounder is missing from the data.", when:nonrandom},
  {id:"n_overlap", q:"Do treated and untreated units overlap on the confounders?", h:"Overlap means units with similar confounder values appear in both groups. Answer No if some kinds of units are always or never treated.", when:A=>nonrandom(A)&&A.n_soo==="yes"},
- {id:"n_tte", q:"Are longitudinal data available with a clear start of follow-up (time zero) for each unit?", h:"Eligibility, treatment start and follow-up can be defined as in a trial (target trial emulation).", when:A=>nonrandom(A)&&A.n_overlap==="yes"}
+ {id:"n_tte", q:"Are longitudinal data available with a clear start of follow-up (time zero) for each unit?", h:"Eligibility, treatment start and follow-up can be defined as in a trial (target trial emulation).", when:A=>nonrandom(A)&&A.n_soo==="yes"}
 ];
 const Q = Object.fromEntries(STEPS.map(s=>[s.id,s]));
 
@@ -1607,8 +1609,9 @@ function fixedResult(A){
     return null;
   }
   if (A.c_encourage==="yes") return {ids:["R6"]};
-  if (A.c_allget==="yes") return {ids:["R3","R2"]};
-  if (A.c_allget==="no") return {ids:["R2"]};
+  const spillNote = A.c_spill==="yes" ? ["The intervention is delivered to individuals, but whole groups (such as offices) are randomised so that spillover does not reach the control group. The sample size includes the design effect of randomising groups."] : [];
+  if (A.c_allget==="yes") return {ids:["R3","R2"], notes:spillNote};
+  if (A.c_allget==="no") return {ids:["R2"], notes:spillNote};
   if (A.c_two==="yes") return {ids:["R5","R1"]};
   if (A.c_cross==="yes") return {ids:["R4","R1"]};
   if (A.c_interim==="yes") return {ids:["R7","R1"]};
@@ -1623,16 +1626,21 @@ function nonRandomResult(A){
   if (A.n_hold==="yes" && A.n_hold_random==="yes") add("Q8",2,"Eligible units held back for reasons unrelated to unit features");
   if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="yes") add("Q3",3,"Chance of treatment jumps at the cut-off","Fuzzy RDD: the cut-off acts as an instrument; estimates apply to cases near the cut-off whose treatment depends on the cut-off");
   if (A.n_prepost==="yes") add("Q1",4, A.n_timing==="yes"?"Pre-treatment data with staggered timing":"Pre-treatment data for treated and comparison units", A.n_timing==="yes"?"Staggered adoption: use heterogeneity-robust estimators, not plain two-way fixed effects":undefined);
-  if (A.n_comp==="yes") add("Q5",5,"Population-wide intervention with an unaffected comparison series");
+  if (A.n_comp==="yes") add("Q5",5,A.n_pop==="yes"?"Population-wide intervention with an unaffected comparison series":"Few treated aggregate units with an unaffected comparison series");
   if (A.n_few==="yes" && A.n_donor==="yes") add("Q2",6,"Few treated aggregate units with a donor pool");
   if (A.n_iv==="yes" && A.n_iv_excl==="yes") add("Q7",7,"A factor shifts treatment and affects the outcome only through treatment");
-  if (A.n_its==="yes") add("Q4",8,"Population-wide intervention with 8 or more prior time points");
+  if (A.n_its==="yes") add("Q4",8,A.n_pop==="yes"?"Population-wide intervention with 8 or more prior time points":"Few treated aggregate units with 8 or more prior time points");
   if (A.n_hold==="yes" && A.n_hold_random==="no") add("Q6",9,"Held-back cases were selected on case features, so adjust for those features","Within eligible units: compare treated with held-back cases after adjusting for the features used to choose the held-back cases");
   if (A.n_soo==="yes" && A.n_overlap==="yes") add("Q6",9,"Pre-treatment data on the confounders, with overlap");
+  if (A.n_soo==="yes" && A.n_overlap==="no") add("Q6",9,"Pre-treatment data on the confounders, with limited overlap","Limited overlap: restrict the comparison to units with similar confounder values in both groups (trimming), so the estimate applies to those units only");
   if (A.n_tte==="yes") add("O1",9.5,"Longitudinal data with a clear time zero");
   if (A.n_cut==="yes" && A.n_cut_sharp==="no" && A.n_cut_jump==="no") notes.push("The cut-off only defines who is eligible and does not identify an effect by itself. Restrict the comparison to eligible units.");
   if (A.n_timing==="yes" && A.n_prepost!=="yes") notes.push("Inconsistent timing alone does not identify an effect without data from before treatment. With a held-back group, compare within each period (period fixed effects).");
   if (A.n_hold==="yes" && A.n_timing==="yes") notes.push("Holdback that occurs only in some periods: use only those periods for the treated versus held-back comparison and include period fixed effects; check that cases in those periods resemble the rest.");
+  if (A.n_few==="yes" && A.n_prepost==="yes") notes.push("With only one or a few treated units, conventional clustered standard errors for a difference-in-differences comparison reject a true null far too often. Randomisation (permutation) inference, which treats each untreated unit in turn as if treated, is the usual alternative, although inference remains imperfect when units differ in size (MacKinnon and Webb 2020).");
+  if (fewNoPool(A)) notes.push("A synthetic control is not offered: the design needs outcome data for many untreated units over a long period before the intervention.");
+  if (A.n_iv==="yes" && A.n_iv_excl==="no") notes.push("The factor that affects who is treated also affects the outcome directly, so the factor is not a valid instrument. Include the factor among the confounders to adjust for. If the factor is as good as random, the effect of the factor itself can still be estimated, but not the effect of treatment.");
+  if (A.n_overlap==="no" && A.n_tte==="yes") notes.push("Limited overlap also applies to the target trial emulation: set the eligibility criteria so that every included unit could have received either condition.");
   const sorted = c.sort((a,b)=>a.rank-b.rank);
   if (sorted.filter(x=>x.id!=="O1").length>1) notes.push("Several designs fit and can be combined (for example a held-back comparison with period fixed effects, checked against a fuzzy RDD near the cut-off). Agreement across designs strengthens the finding.");
   if (!sorted.length) return {ids:["O5"], theory:true, notes};
